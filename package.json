@@ -2,7 +2,7 @@
   "name": "quiz-app1",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://joseph-bosch.github.io/quiz-app/",
+  "homepage": "",
   "dependencies": {
     "@supabase/supabase-js": "^2.50.2",
     "@testing-library/dom": "^10.4.0",
