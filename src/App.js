@@ -4,7 +4,7 @@ import { supabase } from './supabaseClient';
 import * as XLSX from "xlsx";
 import "./App.css";
 
-const QUESTIONS_URL = process.env.PUBLIC_URL + "/questions.json";
+const QUESTIONS_URL = `${process.env.PUBLIC_URL}/questions.json`;
 const PASS_MARK = 70;
 const ADMIN_NAMES = ["joseph", "queenie"];
 
@@ -37,8 +37,12 @@ function App() {
     fetch(QUESTIONS_URL)
       .then((res) => res.json())
       .then((data) => {
-        const shuffled = data.sort(() => 0.5 - Math.random());
-        setQuestions(shuffled.slice(0, 10));
+        const shuffled = data.sort(() => 0.5 - Math.random()).slice(0, 10);
+        const questionsWithShuffledOptions = shuffled.map(q => ({
+          ...q,
+          options: [...q.options].sort(() => 0.5 - Math.random())
+        }));
+        setQuestions(questionsWithShuffledOptions);
         setAnswers({});
         setScore(0);
         setCurrentIndex(0);
@@ -46,6 +50,7 @@ function App() {
         setInsertError(null);
       });
   };
+
 
   useEffect(() => {
     if (started) {
@@ -332,7 +337,7 @@ function App() {
     <div
       className="quiz-screen"
       style={{
-        background: `url('${process.env.PUBLIC_URL}/images/quizTime.avif') no-repeat center center / cover`,
+        background: `url('${process.env.PUBLIC_URL}/images/quizTime.jpg') no-repeat center center / cover`,
         minHeight: '100vh',
         // other styles...
       }}
@@ -347,7 +352,10 @@ function App() {
       </div>
 
       <div className="quiz-question animate">
-        <p><strong>{currentQuestion.question}</strong></p>
+        <p><strong style={{
+        fontSize: '25px'
+        // other styles...
+      }}>{currentQuestion.question}</strong></p>
         {currentQuestion.options.map((opt, idx) => (
           <button
             key={idx}
