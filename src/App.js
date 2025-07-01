@@ -4,7 +4,7 @@ import { supabase } from './supabaseClient';
 import * as XLSX from "xlsx";
 import "./App.css";
 
-const QUESTIONS_URL = "/questions.json";
+const QUESTIONS_URL = process.env.PUBLIC_URL + "/questions.json";
 const PASS_MARK = 70;
 const ADMIN_NAMES = ["joseph", "queenie"];
 
@@ -126,7 +126,7 @@ function App() {
       <div
         className="quiz-screen"
         style={{
-          background: `url('/images/quiz.png') no-repeat center center / cover`,
+          background: `url('${process.env.PUBLIC_URL}/images/quiz.png') no-repeat center center / cover`,
           minHeight: '100vh'
         }}
       >
@@ -332,7 +332,7 @@ function App() {
     <div
       className="quiz-screen"
       style={{
-        background: `url('/images/quizTime.avif') no-repeat center center / cover`,
+        background: `url('${process.env.PUBLIC_URL}/images/quizTime.avif') no-repeat center center / cover`,
         minHeight: '100vh',
         // other styles...
       }}
