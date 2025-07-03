@@ -59,6 +59,33 @@ body, html {
   color: #fff;
 }
 
+/* .quiz-screen input {
+  display: flex;         
+  width: 250px;          
+  padding: 0.5rem;
+  font-size: 1rem;
+  margin-bottom: 1rem;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+} */
+
+/* .quiz-screen button {
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  cursor: pointer;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+} */
+
+.quiz-screen button:hover {
+  background-color: #45a049;
+}
+
 .quiz-header {
   width: 100%;
   max-width: 600px;

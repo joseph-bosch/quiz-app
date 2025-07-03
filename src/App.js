@@ -11,12 +11,16 @@ const PASS_MARK = 90;
 const ADMIN_NAMES = ["joseph", "queenie"];
 
 function App() {
+  const [welcomeComplete, setWelcomeComplete] = useState(false);
   const [questions, setQuestions] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState(0);
-  const [name, setName] = useState("");
+  // const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [employeeNo, setEmployeeNo] = useState("");
   const [started, setStarted] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [allHistory, setAllHistory] = useState([]);
@@ -24,6 +28,7 @@ function App() {
   const [historyPage, setHistoryPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
+  const name = `${firstName.trim()} ${lastName.trim()}`.trim();
   const thStyle = {
     padding: "0.75rem",
     borderBottom: "1px solid #ccc",
@@ -130,6 +135,7 @@ function App() {
         score: finalScore,
         total: questions.length,
         pass: passed,
+        emp_num: employeeNo,
       },
     ]);
 
@@ -149,6 +155,7 @@ function App() {
   const exportToExcel = () => {
     const worksheet = XLSX.utils.json_to_sheet(allHistory.map(row => ({
       Name: row.name,
+      "Employee No": row.employee_no || '',
       Score: row.score,
       Total: row.total,
       Result: row.pass ? "Pass" : "Fail",
@@ -158,6 +165,36 @@ function App() {
     XLSX.utils.book_append_sheet(workbook, worksheet, "QuizHistory");
     XLSX.writeFile(workbook, "Quiz_History.xlsx");
   };
+
+  if (!welcomeComplete && !showHistory) {
+    return (
+      <div
+        className="quiz-screen"
+        style={{
+          background: `url('/images/quiz.png') no-repeat center center / cover`,
+          minHeight: '100vh'
+        }}
+      >
+        <div className="start-content" style={{
+          color: 'black'
+        }}>
+          <h1>Hi👋，欢迎来到测验时间！</h1>
+          <p>
+            恭喜您完成培训课程！接下来的测验是帮助您复习刚才的重点，也是获得证书的最后一步啦！
+            <br />
+            • 测验题数：10 题
+            <br />
+            • 轻松作答就好～
+            <br />
+            别紧张，放轻松，您一定可以顺利完成！
+            <br />
+            准备好了吗？Let’s go 🚀🚀🚀
+          </p>
+          <button onClick={() => setWelcomeComplete(true)}>Start</button>
+        </div>
+      </div>
+    );
+  }
 
   if (!started && !showHistory) {
     return (
@@ -170,21 +207,42 @@ function App() {
         }}
       >
         <div className="start-content">
-          <h1 style={{ color:'black' }}>🎓 Welcome to the Quiz</h1>
+          <h1 style={{ color: 'black' }}>🎓 请输入员工号和名字</h1>
           <input
             type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Enter your name"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            placeholder="姓"
+          style={{width: "250px"}} />
+          <input
+            type="text"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            placeholder="名"
+            style={{width: "250px"}} 
           />
-          <button onClick={() => name.trim() && setStarted(true)}>Start Quiz</button>
-          {ADMIN_NAMES.includes(name.trim().toLowerCase()) && (
-            <button onClick={() => setShowHistory(true)}>View History</button>
+          <input
+            type="text"
+            value={employeeNo}
+            onChange={(e) => setEmployeeNo(e.target.value)}
+            placeholder="工号"
+            style={{width: "250px"}} 
+          /><br></br>
+          <button
+            onClick={() =>
+              firstName.trim() && lastName.trim() && employeeNo.trim() && setStarted(true)
+            }
+          >
+            开始测验
+          </button>
+          {ADMIN_NAMES.includes(firstName.trim().toLowerCase()) && (
+            <button onClick={() => setShowHistory(true)}>查看记录</button>
           )}
         </div>
       </div>
     );
   }
+
 
   if (showHistory) {
     const totalPages = Math.ceil(allHistory.length / ITEMS_PER_PAGE);
@@ -241,6 +299,7 @@ function App() {
           }}>
             <thead>
               <tr style={{ backgroundColor: "#f2f2f2" }}>
+                <th style={thStyle}>Employee Number</th>
                 <th style={thStyle}>Name</th>
                 <th style={thStyle}>Score</th>
                 <th style={thStyle}>Total</th>
@@ -251,6 +310,7 @@ function App() {
             <tbody>
               {pagedHistory.map((h, i) => (
                 <tr key={i} style={{ backgroundColor: i % 2 === 0 ? "#fff" : "#f9f9f9" }}>
+                  <td style={tdStyle}>{h.emp_num}</td>
                   <td style={tdStyle}>{h.name}</td>
                   <td style={tdStyle}>{h.score}</td>
                   <td style={tdStyle}>{h.total}</td>
@@ -311,22 +371,24 @@ function App() {
 
     return (
       <div className="result-screen">
-        <h2>📊 Quiz Results</h2>
-        <p>Your score: {score} / {questions.length} ({percentage.toFixed(0)}%)</p>
+        <h2>📊 测验结果</h2>
+        <p>你的分数: {score} / {questions.length} ({percentage.toFixed(0)}%)</p>
         <p style={{ color: passed ? "green" : "red", fontWeight: "bold", fontSize: "1.5rem" }}>
-          {passed ? "🎉 Congratulations, you passed!" : "❌ You did not pass. Try again!"}
+          {passed
+            ? "🎉 恭喜完成測驗！您的努力值得肯定 👏"
+            : "这次分数还差一点点！别灰心～再挑战一次就有机会通过啰！请重新扫码并完成测验，加油！💪"}
         </p>
         {insertError && <p style={{ color: "red" }}>❌ Error saving score: {insertError}</p>}
 
         {wrongAnswers.length > 0 && (
           <div className="review-section">
-            <h3>🧐 Review of Wrong Answers:</h3>
+            <h3>🧐 错误答案的复习:</h3>
             <ul>
               {wrongAnswers.map((q, i) => (
                 <li key={i} style={{ marginBottom: '1rem' }}>
                   <strong>Q:</strong> {q.question}<br />
-                  <strong>Your Answer:</strong> {Array.isArray(answers[questions.indexOf(q)]) ? answers[questions.indexOf(q)].join(", ") : (answers[questions.indexOf(q)] || 'Not Answered')}<br />
-                  <strong>Correct Answer:</strong> {Array.isArray(q.correct) ? q.correct.join(", ") : q.correct}
+                  <strong>您的答案:</strong> {Array.isArray(answers[questions.indexOf(q)]) ? answers[questions.indexOf(q)].join(", ") : (answers[questions.indexOf(q)] || 'Not Answered')}<br />
+                  <strong>正确答案:</strong> {Array.isArray(q.correct) ? q.correct.join(", ") : q.correct}
                 </li>
               ))}
             </ul>
@@ -336,8 +398,8 @@ function App() {
         <button className="submit-button" onClick={() => {
           setStarted(true);
           loadShuffledQuestions();
-        }}>🔁 Try Again</button>
-        <button className="submit-button" style={{ backgroundColor: '#dc3545' }} onClick={resetQuiz}>⏹ Close Quiz</button>
+        }}>🔁 再挑战</button>
+        <button className="submit-button" style={{ backgroundColor: '#dc3545' }} onClick={resetQuiz}>⏹ 结束</button>
       </div>
     );
   }
@@ -363,7 +425,7 @@ function App() {
   >
     <div className="quiz-header">
       <h2>Question {currentIndex + 1} of {questions.length}</h2>
-      <button onClick={resetQuiz}>❌ Close Quiz</button>
+      <button onClick={resetQuiz}>❌ 停止</button>
     </div>
 
     <div className="progress-bar">
@@ -405,7 +467,7 @@ function App() {
         onClick={() => setCurrentIndex(currentIndex + 1)}
         disabled={(answers[currentIndex]?.length ?? 0) === 0} // disable if no answer
       >
-        Next
+        下一页
       </button>
     )}
 
@@ -421,7 +483,7 @@ function App() {
             : !answers[currentIndex]
         }
       >
-        Submit Quiz
+        提交测验
       </button>
     )}
   </div>
