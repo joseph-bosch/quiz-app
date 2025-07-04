@@ -306,7 +306,7 @@ body, html {
 .certificate-overlay-text {
   font-family: "Noto Sans SC", "Microsoft YaHei", "Arial", sans-serif;
   position: absolute;
-  top: 35%; /* adjust as needed */
+  top: 32%; /* adjust as needed */
   left: 50%;
   transform: translateX(-50%);
   width: 80%;
@@ -355,7 +355,7 @@ body, html {
     font-size: 0.5rem;
     line-height: 0.2rem;
     width: 90%;
-    top: 30%; /* tweak for better fit */
+    top: 33%; /* tweak for better fit */
   }
 
   .certificate-overlay-text h2 {
@@ -364,7 +364,7 @@ body, html {
 
   .certificate-overlay-text p {
     font-size: 0.6rem;
-    line-height: 0.2rem;
+    line-height: 0.02rem;
   }
 }
 

@@ -489,10 +489,15 @@ function App() {
                   <p>This is to certify that</p>
                   <h2>{name} ({department})</h2>
                   <p>has successfully completed the MA Strategy quiz.</p>
-                  <p>Score: {percentage.toFixed(0)}% </p>
-                  <p>Date: {new Date().toLocaleDateString()}</p>
-                  <p>Bosch Automotive Products (Shenzhen)</p>
+                  
+                  <div style={{ justifyContent: "center", gap: "20px", paddingBottom:"0px" }}>
+                    <p>Score: {percentage.toFixed(0)}%</p>
+                    <p>Date: {new Date().toLocaleDateString()}</p>
+                  </div>
+
+                  <p>Bosch Automotive Products (Shenzhen) Co., Ltd.</p>
                 </div>
+
               </div>
             </div>
           </div>
@@ -691,7 +696,7 @@ const generateCertificate = async (name, score, total, department) => {
   drawTextWithShadow("has successfully completed the MA Strategy quiz.", centerX - customFont.widthOfTextAtSize("has successfully completed the MA Strategy quiz.", 20) / 2, height - 380, 20);
   drawTextWithShadow(`Score: ${percentage.toFixed(0)}%`, centerX - customFont.widthOfTextAtSize(`Score: ${percentage.toFixed(0)}%`, 18) / 2, height - 460, 18);
   drawTextWithShadow(`Date: ${date}`, centerX - customFont.widthOfTextAtSize(`Date: ${date}`, 18) / 2, height - 420, 18);
-  drawTextWithShadow("Bosch Automotive Products (Shenzhen)", centerX - customFont.widthOfTextAtSize("Bosch Automotive Products (Shenzhen) Co., Ltd.", 16) / 2, height - 510, 16);
+  drawTextWithShadow("Bosch Automotive Products (Shenzhen) Co., Ltd.", centerX - customFont.widthOfTextAtSize("Bosch Automotive Products (Shenzhen) Co., Ltd.", 16) / 2, height - 510, 16);
 
   // Export PDF
   const pdfBytes = await pdfDoc.save();
