@@ -1,9 +1,10 @@
 // Updated App.js
 import React, { useState, useEffect } from "react";
+import Select from "react-select";
 import { supabase } from './supabaseClient';
 import * as XLSX from "xlsx";
 import "./App.css";
-import jsPDF from "jspdf";
+
 import { PDFDocument, rgb } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 
@@ -21,10 +22,9 @@ function App() {
   const [answers, setAnswers] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState(0);
-  // const [name, setName] = useState("");
-  const [firstName, setFirstName] = useState("");
+  const [name, setName] = useState("");
+  const [department, setDepartment] = useState("");
   const [showCertImage, setShowCertImage] = useState(false);
-  const [lastName, setLastName] = useState("");
   const [employeeNo, setEmployeeNo] = useState("");
   const [started, setStarted] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -33,7 +33,19 @@ function App() {
   const [historyPage, setHistoryPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
-  const name = `${firstName.trim()} ${lastName.trim()}`.trim();
+  const departments = [
+    "BD/SLP-CO2", "C/TXR-CN-D4", "GR/FCM-Shz", "GS/OBR23-APAC17", "GS/OSD4-APAC16",
+    "GS/PSD5-AP", "MA/HRL-Shz", "MA-WS/PAS-EAA-CN", "MA-WS/PAW-ENG1-CN", "MA-WS/PAW-ENG2-CN",
+    "MA-WS/PAW-ENG3-CN", "MA-WS/PAW-ENG-CN", "MA-WS/PUQ1-Shz", "MA-WS/PUQ2-Shz", "MA-WS/PUQ-Shz",
+    "MA-WS/PUR2", "ShzP/COR", "ShzP/CTG", "ShzP/HSE", "ShzP/LOG", "ShzP/LOP", "ShzP/LOW", "ShzP/LOW1",
+    "ShzP/LOW2", "ShzP/MFE", "ShzP/MFI", "ShzP/MFO1", "ShzP/MFO11", "ShzP/MFO12", "ShzP/MFO13",
+    "ShzP/MFO2", "ShzP/MFO21", "ShzP/MFO22", "ShzP/MFO23", "ShzP/MFO24", "ShzP/MFO3", "ShzP/MFO31",
+    "ShzP/MFO32", "ShzP/MFO33", "ShzP/MFO4", "ShzP/MFO5", "ShzP/MFO51", "ShzP/MFO52", "ShzP/MFO53",
+    "ShzP/MOE", "ShzP/PM", "ShzP/QMM", "ShzP/QMM1", "ShzP/QMM2", "ShzP/QMM6", "ShzP/TEF", "ShzP/TEF1",
+    "ShzP/TEF2"
+  ].map((dept) => ({ value: dept, label: dept }));
+
+  // const name = `${firstName.trim()} ${lastName.trim()}`.trim();
   const thStyle = {
     padding: "0.75rem",
     borderBottom: "1px solid #ccc",
@@ -141,6 +153,7 @@ function App() {
         total: questions.length,
         pass: passed,
         emp_num: employeeNo,
+        department: department,
       },
     ]);
 
@@ -212,35 +225,65 @@ function App() {
         }}
       >
         <div className="start-content">
-          <h1 style={{ color: 'black' }}>🎓 请输入员工号和名字</h1>
-          <input
-            type="text"
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            placeholder="姓"
-          style={{width: "250px"}} />
-          <input
-            type="text"
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-            placeholder="名"
-            style={{width: "250px"}} 
-          />
+          <h1 style={{ color: 'black' }}>🎓 请输入您的信息</h1>
+
           <input
             type="text"
             value={employeeNo}
             onChange={(e) => setEmployeeNo(e.target.value)}
             placeholder="工号"
             style={{width: "250px"}} 
-          /><br></br>
+          />
+          <Select
+            options={departments}
+            placeholder="选择部门"
+            onChange={(selected) => setDepartment(selected ? selected.value : "")}
+            styles={{
+              container: (base) => ({
+                ...base,
+                width: "277px",
+                borderRadius: "12px",
+                textAlign: "left",
+                left: "15%",
+                color:"black"
+              }),
+              control: (base) => ({
+                ...base,
+                borderRadius: "8px",
+                textAlign: "left",
+                minHeight: "40px",
+                paddingLeft: "10px", // this helps left-align the placeholder
+              }),
+              placeholder: (base) => ({
+                ...base,
+                textAlign: "left",
+                marginLeft: 0,
+              }),
+            }}
+          />
+
+          {/* <input
+            type="text"
+            value={department}
+            onChange={(e) => setDepartment(e.target.value)}
+            placeholder="部门"
+          style={{width: "250px"}} /> */}
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="姓名"
+            style={{width: "250px"}} 
+          />
+          <br></br>
           <button
             onClick={() =>
-              firstName.trim() && lastName.trim() && employeeNo.trim() && setStarted(true)
+              department.trim() && name.trim() && employeeNo.trim() && setStarted(true)
             }
           >
             开始测验
           </button>
-          {ADMIN_NAMES.includes(firstName.trim().toLowerCase()) && (
+          {ADMIN_NAMES.includes(name.trim().toLowerCase()) && (
             <button onClick={() => setShowHistory(true)}>查看记录</button>
           )}
         </div>
@@ -306,8 +349,9 @@ function App() {
               <tr style={{ backgroundColor: "#f2f2f2" }}>
                 <th style={thStyle}>Employee Number</th>
                 <th style={thStyle}>Name</th>
+                <th style={thStyle}>Dept</th>
                 <th style={thStyle}>Score</th>
-                <th style={thStyle}>Total</th>
+                
                 <th style={thStyle}>Result</th>
                 <th style={thStyle}>Time</th>
               </tr>
@@ -317,8 +361,9 @@ function App() {
                 <tr key={i} style={{ backgroundColor: i % 2 === 0 ? "#fff" : "#f9f9f9" }}>
                   <td style={tdStyle}>{h.emp_num}</td>
                   <td style={tdStyle}>{h.name}</td>
+                  <td style={tdStyle}>{h.department}</td>
                   <td style={tdStyle}>{h.score}</td>
-                  <td style={tdStyle}>{h.total}</td>
+                  
                   <td style={{ ...tdStyle, fontWeight: "bold", color: h.pass ? "green" : "red" }}>
                     {h.pass ? "✅ Pass" : "❌ Fail"}
                   </td>
@@ -381,7 +426,7 @@ function App() {
         {passed && (
           <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
           <button className="submit-button" onClick={() => setShowCertImage(true)}>🖼️ 查看证书</button>
-          <button className="submit-button" onClick={() => generateCertificate(name, score, questions.length)}>📄 下载证书</button>
+          <button className="submit-button" onClick={() => generateCertificate(name, score, questions.length, department)}>📄 下载证书</button>
           
         </div>
         )}
@@ -398,7 +443,7 @@ function App() {
                 />
                 <div className="certificate-overlay-text">
                   <p>This is to certify that</p>
-                  <h2>{name}</h2>
+                  <h2>{name} ({department})</h2>
                   <p>has successfully completed the MA Strategy quiz.</p>
                   <p>Score: {percentage.toFixed(0)}% </p>
                   <p>Date: {new Date().toLocaleDateString()}</p>
@@ -412,11 +457,11 @@ function App() {
 
 
         {/* Certificate Image */}
-        {showCertImage && (
+        {/* {showCertImage && (
           <div style={{ textAlign: 'center' }}>
             <img src="/images/certCompleted.jpg" alt="Certificate" style={{ maxWidth: '100%' }} />
           </div>
-        )}
+        )} */}
         <h2>📊 测验结果</h2>
         <p>你的分数: {score} / {questions.length} ({percentage.toFixed(0)}%)</p>
         <p style={{ color: passed ? "green" : "red", fontWeight: "bold", fontSize: "1.5rem" }}>
@@ -543,7 +588,7 @@ function App() {
 
 
 
-const generateCertificate = async (name, score, total) => {
+const generateCertificate = async (name, score, total, department) => {
   const bgImageUrl = '/images/certCompleted.jpg';
   const fontUrl = '/SimSun.ttf';
 
@@ -596,9 +641,9 @@ const generateCertificate = async (name, score, total) => {
       color: rgb(0, 0, 0), // Black
     });
   };
-
+  const textName = name + `(${department})`;
   drawTextWithShadow("This is to certify that", centerX - customFont.widthOfTextAtSize("This is to certify that", 24) / 2, height - 280, 24);
-  drawTextWithShadow(name, centerX - customFont.widthOfTextAtSize(name, 36) / 2, height - 335, 36);
+  drawTextWithShadow(textName, centerX - customFont.widthOfTextAtSize(textName, 36) / 2, height - 335, 36);
   drawTextWithShadow("has successfully completed the MA Strategy quiz.", centerX - customFont.widthOfTextAtSize("has successfully completed the MA Strategy quiz.", 20) / 2, height - 380, 20);
   drawTextWithShadow(`Score: ${percentage.toFixed(0)}%`, centerX - customFont.widthOfTextAtSize(`Score: ${percentage.toFixed(0)}%`, 18) / 2, height - 460, 18);
   drawTextWithShadow(`Date: ${date}`, centerX - customFont.widthOfTextAtSize(`Date: ${date}`, 18) / 2, height - 420, 18);
