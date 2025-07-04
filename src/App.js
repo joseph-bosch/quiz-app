@@ -12,7 +12,7 @@ import fontkit from '@pdf-lib/fontkit';
 // const QUESTIONS_URL = `${process.env.PUBLIC_URL}/questions.json`;
 const QUESTIONS_URL = "/questions.json";
 
-const PASS_MARK = 90;
+const PASS_MARK = 10;
 const ADMIN_NAMES = ["joseph-admin", "queenie-admin"];
 
 function App() {
