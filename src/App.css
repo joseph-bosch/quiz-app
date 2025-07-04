@@ -286,6 +286,7 @@ body, html {
 }
 
 .certificate-overlay-text {
+  font-family: "Noto Sans SC", "Microsoft YaHei", "Arial", sans-serif;
   position: absolute;
   top: 150px; /* adjust as needed */
   left: 0;

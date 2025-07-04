@@ -4,6 +4,9 @@ import { supabase } from './supabaseClient';
 import * as XLSX from "xlsx";
 import "./App.css";
 import jsPDF from "jspdf";
+import { PDFDocument, rgb } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
+
 
 // const QUESTIONS_URL = `${process.env.PUBLIC_URL}/questions.json`;
 const QUESTIONS_URL = "/questions.json";
@@ -413,7 +416,7 @@ function App() {
         <p>你的分数: {score} / {questions.length} ({percentage.toFixed(0)}%)</p>
         <p style={{ color: passed ? "green" : "red", fontWeight: "bold", fontSize: "1.5rem" }}>
           {passed
-            ? "🎉 恭喜完成測驗！您的努力值得肯定 👏"
+            ? "🎉 恭喜完成测验！您的努力值得肯定 👏"
             : "这次分数还差一点点！别灰心～再挑战一次就有机会通过啰！请重新扫码并完成测验，加油！💪"}
         </p>
         {insertError && <p style={{ color: "red" }}>❌ Error saving score: {insertError}</p>}
@@ -533,50 +536,110 @@ function App() {
 
 
 
+
+
 const generateCertificate = async (name, score, total) => {
-  const doc = new jsPDF({
-    orientation: "landscape",     // Better certificate layout
-    unit: "pt",
-    format: [842, 595]            // A4 landscape size in points (≈ 11.69 × 8.27 in)
+  // Load the certificate background image (from public folder)
+  const bgImageUrl = '/images/certCompleted.jpg';
+
+  // Load font file from public folder
+  const fontUrl = '/SimSun.ttf';
+
+  // Fetch assets as ArrayBuffers
+  const [bgImageBytes, fontBytes] = await Promise.all([
+    fetch(bgImageUrl).then((res) => res.arrayBuffer()),
+    fetch(fontUrl).then((res) => res.arrayBuffer()),
+  ]);
+
+  // Create a new PDF document
+  const pdfDoc = await PDFDocument.create();
+  pdfDoc.registerFontkit(fontkit);
+
+  // Embed the font for Chinese support
+  const customFont = await pdfDoc.embedFont(fontBytes);
+
+  // Embed the background image (JPEG or PNG)
+  const bgImage = await pdfDoc.embedJpg(bgImageBytes);
+
+  // Create a page with the same size as the image
+  const { width, height } = bgImage.scale(1);
+
+  const page = pdfDoc.addPage([width, height]);
+
+  // Draw the background image filling the page
+  page.drawImage(bgImage, {
+    x: 0,
+    y: 0,
+    width,
+    height,
   });
-  const percentage = (score * 10);
 
-  // Load background image
-  const img = new Image();
-  img.src = "/images/certCompleted.jpg";
+  const centerX = width / 2;
+  const date = new Date().toLocaleDateString();
+  const percentage = (score / total) * 100;
 
-  img.onload = () => {
-    doc.addImage(img, "JPEG", 0, 0, 842, 595); // Fit to full canvas
+  // Draw text on the page using the embedded font
+  page.drawText("This is to certify that", {
+    x: centerX - customFont.widthOfTextAtSize("This is to certify that", 24) / 2,
+    y: height - 280,
+    size: 24,
+    font: customFont,
+    color: rgb(0, 0, 0),
+  });
 
-    const centerX = 842 / 2;
-    const date = new Date().toLocaleDateString();
+  page.drawText(name, {
+    x: centerX - customFont.widthOfTextAtSize(name, 36) / 2,
+    y: height - 335,
+    size: 36,
+    font: customFont,
+    color: rgb(0, 0, 0),
+  });
 
-    doc.setFont("Helvetica", "normal");
-    doc.setFontSize(20);
-    doc.text("This is to certify that", centerX, 260, { align: "center" });
+  page.drawText("has successfully completed the MA Strategy quiz.", {
+    x: centerX - customFont.widthOfTextAtSize("has successfully completed the MA Strategy quiz.", 20) / 2,
+    y: height - 380,
+    size: 20,
+    font: customFont,
+    color: rgb(0, 0, 0),
+  });
 
-    doc.setFont("Helvetica", "bold");
-    doc.setFontSize(32);
-    doc.text(name, centerX, 300, { align: "center" });
+  page.drawText(`Score: ${percentage.toFixed(0)}%`, {
+    x: centerX - customFont.widthOfTextAtSize(`Score: ${percentage.toFixed(0)}%`, 18) / 2,
+    y: height - 460,
+    size: 18,
+    font: customFont,
+    color: rgb(0, 0, 0),
+  });
 
-    doc.setFont("Helvetica", "normal");
-    doc.setFontSize(20);
-    doc.text("has successfully completed the MA Strategy quiz.", centerX, 340, { align: "center" });
+  page.drawText(`Date: ${date}`, {
+    x: centerX - customFont.widthOfTextAtSize(`Date: ${date}`, 18) / 2,
+    y: height - 420,
+    size: 18,
+    font: customFont,
+    color: rgb(0, 0, 0),
+  });
 
-    doc.setFontSize(18);
-    doc.text(`Score: ${percentage.toFixed(0)}%`, centerX, 380, { align: "center" });
-    doc.text(`Date: ${date}`, centerX, 410, { align: "center" });
+  page.drawText("Bosch Automotive Products (Shenzhen)", {
+    x: centerX - customFont.widthOfTextAtSize("Bosch Automotive Products (Shenzhen)", 16) / 2,
+    y: height - 510,
+    size: 16,
+    font: customFont,
+    color: rgb(0, 0, 0),
+  });
 
-    doc.setFontSize(16);
-    doc.text("Bosch Automotive Products (Shenzhen)", centerX, 470, { align: "center" });
+  // Serialize PDF document to bytes
+  const pdfBytes = await pdfDoc.save();
 
-    doc.save(`Certificate-${name}.pdf`);
-  };
-
-  img.onerror = (e) => {
-    console.error("Failed to load certificate background image", e);
-  };
+  // Trigger download in browser
+  const blob = new Blob([pdfBytes], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Certificate-${name}.pdf`;
+  a.click();
+  URL.revokeObjectURL(url);
 };
+
 
 
 
