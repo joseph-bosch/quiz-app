@@ -390,20 +390,25 @@ function App() {
           <div className="certificate-modal">
             <div className="certificate-content">
               <span className="close-button" onClick={() => setShowCertImage(false)}>×</span>
-              <div style={{ position: 'relative' }}>
-                <img src="/images/certCompleted.jpg" alt="Certificate" />
+              <div className="certificate-overlay">
+                <img
+                  src="/images/certCompleted.jpg"
+                  alt="Certificate"
+                  className="certificate-image"
+                />
                 <div className="certificate-overlay-text">
                   <p>This is to certify that</p>
-                  <h2 style={{ fontWeight: "bold" }}>{name}</h2>
+                  <h2>{name}</h2>
                   <p>has successfully completed the MA Strategy quiz.</p>
                   <p>Score: {percentage.toFixed(0)}% </p>
                   <p>Date: {new Date().toLocaleDateString()}</p>
-                  <p>Bosch Automotive Products (Shenzhen) </p>
+                  <p>Bosch Automotive Products (Shenzhen)</p>
                 </div>
               </div>
             </div>
           </div>
         )}
+
 
 
         {/* Certificate Image */}
@@ -539,34 +544,25 @@ function App() {
 
 
 const generateCertificate = async (name, score, total) => {
-  // Load the certificate background image (from public folder)
   const bgImageUrl = '/images/certCompleted.jpg';
-
-  // Load font file from public folder
   const fontUrl = '/SimSun.ttf';
 
-  // Fetch assets as ArrayBuffers
+  // Load assets
   const [bgImageBytes, fontBytes] = await Promise.all([
     fetch(bgImageUrl).then((res) => res.arrayBuffer()),
     fetch(fontUrl).then((res) => res.arrayBuffer()),
   ]);
 
-  // Create a new PDF document
   const pdfDoc = await PDFDocument.create();
   pdfDoc.registerFontkit(fontkit);
 
-  // Embed the font for Chinese support
   const customFont = await pdfDoc.embedFont(fontBytes);
-
-  // Embed the background image (JPEG or PNG)
   const bgImage = await pdfDoc.embedJpg(bgImageBytes);
-
-  // Create a page with the same size as the image
   const { width, height } = bgImage.scale(1);
 
   const page = pdfDoc.addPage([width, height]);
 
-  // Draw the background image filling the page
+  // Draw background image
   page.drawImage(bgImage, {
     x: 0,
     y: 0,
@@ -578,59 +574,39 @@ const generateCertificate = async (name, score, total) => {
   const date = new Date().toLocaleDateString();
   const percentage = (score / total) * 100;
 
-  // Draw text on the page using the embedded font
-  page.drawText("This is to certify that", {
-    x: centerX - customFont.widthOfTextAtSize("This is to certify that", 24) / 2,
-    y: height - 280,
-    size: 24,
-    font: customFont,
-    color: rgb(0, 0, 0),
-  });
+  // Draw text with shadow effect
+  const drawTextWithShadow = (text, x, y, size) => {
+    const shadowOffset = 1;
 
-  page.drawText(name, {
-    x: centerX - customFont.widthOfTextAtSize(name, 36) / 2,
-    y: height - 335,
-    size: 36,
-    font: customFont,
-    color: rgb(0, 0, 0),
-  });
+    // Shadow layer
+    page.drawText(text, {
+      x: x + shadowOffset,
+      y: y - shadowOffset,
+      size,
+      font: customFont,
+      color: rgb(0.6, 0.6, 0.6), // Dark gray
+    });
 
-  page.drawText("has successfully completed the MA Strategy quiz.", {
-    x: centerX - customFont.widthOfTextAtSize("has successfully completed the MA Strategy quiz.", 20) / 2,
-    y: height - 380,
-    size: 20,
-    font: customFont,
-    color: rgb(0, 0, 0),
-  });
+    // Main text layer
+    page.drawText(text, {
+      x,
+      y,
+      size,
+      font: customFont,
+      color: rgb(0, 0, 0), // Black
+    });
+  };
 
-  page.drawText(`Score: ${percentage.toFixed(0)}%`, {
-    x: centerX - customFont.widthOfTextAtSize(`Score: ${percentage.toFixed(0)}%`, 18) / 2,
-    y: height - 460,
-    size: 18,
-    font: customFont,
-    color: rgb(0, 0, 0),
-  });
+  drawTextWithShadow("This is to certify that", centerX - customFont.widthOfTextAtSize("This is to certify that", 24) / 2, height - 280, 24);
+  drawTextWithShadow(name, centerX - customFont.widthOfTextAtSize(name, 36) / 2, height - 335, 36);
+  drawTextWithShadow("has successfully completed the MA Strategy quiz.", centerX - customFont.widthOfTextAtSize("has successfully completed the MA Strategy quiz.", 20) / 2, height - 380, 20);
+  drawTextWithShadow(`Score: ${percentage.toFixed(0)}%`, centerX - customFont.widthOfTextAtSize(`Score: ${percentage.toFixed(0)}%`, 18) / 2, height - 460, 18);
+  drawTextWithShadow(`Date: ${date}`, centerX - customFont.widthOfTextAtSize(`Date: ${date}`, 18) / 2, height - 420, 18);
+  drawTextWithShadow("Bosch Automotive Products (Shenzhen)", centerX - customFont.widthOfTextAtSize("Bosch Automotive Products (Shenzhen) Co., Ltd.", 16) / 2, height - 510, 16);
 
-  page.drawText(`Date: ${date}`, {
-    x: centerX - customFont.widthOfTextAtSize(`Date: ${date}`, 18) / 2,
-    y: height - 420,
-    size: 18,
-    font: customFont,
-    color: rgb(0, 0, 0),
-  });
-
-  page.drawText("Bosch Automotive Products (Shenzhen)", {
-    x: centerX - customFont.widthOfTextAtSize("Bosch Automotive Products (Shenzhen)", 16) / 2,
-    y: height - 510,
-    size: 16,
-    font: customFont,
-    color: rgb(0, 0, 0),
-  });
-
-  // Serialize PDF document to bytes
+  // Export PDF
   const pdfBytes = await pdfDoc.save();
 
-  // Trigger download in browser
   const blob = new Blob([pdfBytes], { type: "application/pdf" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
