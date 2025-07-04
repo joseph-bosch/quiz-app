@@ -342,7 +342,7 @@ body, html {
 
 @media (max-width: 600px) {
   .certificate-overlay-text {
-    font-size: 0.9rem;
+    font-size: 0.4rem;
     width: 90%;
     top: 15%; /* tweak for better fit */
   }
