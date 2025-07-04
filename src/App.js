@@ -245,9 +245,9 @@ function App() {
                 ...base,
                 width: "275px",
                 borderRadius: "12px",
-                textAlign: "left",
-                left: "3%",
-                color:"black"
+                color: "black",
+                // Remove left, and rely on parent layout
+                margin: "0 auto", // if you want it centered
               }),
               control: (base) => ({
                 ...base,
@@ -255,7 +255,7 @@ function App() {
                 fontSize: "12px",
                 textAlign: "left",
                 minHeight: "40px",
-                paddingLeft: "5px", // this helps left-align the placeholder
+                paddingLeft: "5px",
               }),
               placeholder: (base) => ({
                 ...base,
@@ -264,6 +264,7 @@ function App() {
               }),
             }}
           />
+
 
           {/* <input
             type="text"

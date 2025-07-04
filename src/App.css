@@ -20,6 +20,7 @@ body, html {
   padding: 2rem;
   border-radius: 12px;
   text-align: center;
+  justify-Content: "center";
   max-width: 400px;
   width: 90%;
   box-shadow: 0 0 15px rgba(0,0,0,0.2);
@@ -32,6 +33,14 @@ body, html {
   border: 1px solid #ccc;
   border-radius: 8px;
 }
+
+/* .start-content Select {
+  width: 100%;
+  padding: 0.7rem;
+  margin: 1rem 0;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+} */
 
 .start-content button {
   background: #007bff;
