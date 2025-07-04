@@ -295,14 +295,22 @@ body, html {
 }
 
 .certificate-overlay-text {
+  font-family: "Noto Sans SC", "Microsoft YaHei", "Arial", sans-serif;
   position: absolute;
-  top: 58%;
+  top: 18%; /* adjust as needed */
   left: 50%;
-  transform: translate(-50%, -50%);
-  color: rgb(7, 7, 7);
-  text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.7);
-  font-family: "Helvetica", sans-serif;
+  transform: translateX(-50%);
+  width: 80%;
+  text-align: center;
+  color: #000;
+  font-size: 1.2rem;
+  font-weight: bold;
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
 }
+
+/* Responsive scaling for small devices */
+
+
 
 .certificate-overlay-text p {
   font-size: 18px;
@@ -332,7 +340,17 @@ body, html {
   background: #ff4d4d;
 }
 
+@media (max-width: 600px) {
+  .certificate-overlay-text {
+    font-size: 0.9rem;
+    width: 90%;
+    top: 15%; /* tweak for better fit */
+  }
 
+  .certificate-overlay-text h2 {
+    font-size: 1.2rem;
+  }
+}
 
 
 @keyframes fadeIn {
