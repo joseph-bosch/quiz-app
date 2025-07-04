@@ -8,7 +8,7 @@ import jsPDF from "jspdf";
 // const QUESTIONS_URL = `${process.env.PUBLIC_URL}/questions.json`;
 const QUESTIONS_URL = "/questions.json";
 
-const PASS_MARK = 90;
+const PASS_MARK = 10;
 const ADMIN_NAMES = ["joseph-admin", "queenie-admin"];
 
 function App() {
@@ -393,7 +393,7 @@ function App() {
                   <p>This is to certify that</p>
                   <h2 style={{ fontWeight: "bold" }}>{name}</h2>
                   <p>has successfully completed the MA Strategy quiz.</p>
-                  <p>Score: {score} / {questions.length}</p>
+                  <p>Score: {percentage.toFixed(0)}% </p>
                   <p>Date: {new Date().toLocaleDateString()}</p>
                   <p>Bosch Automotive Products (Shenzhen) </p>
                 </div>
@@ -539,6 +539,7 @@ const generateCertificate = async (name, score, total) => {
     unit: "pt",
     format: [842, 595]            // A4 landscape size in points (≈ 11.69 × 8.27 in)
   });
+  const percentage = (score * 10);
 
   // Load background image
   const img = new Image();
@@ -563,7 +564,7 @@ const generateCertificate = async (name, score, total) => {
     doc.text("has successfully completed the MA Strategy quiz.", centerX, 340, { align: "center" });
 
     doc.setFontSize(18);
-    doc.text(`Score: ${score} / ${total}`, centerX, 380, { align: "center" });
+    doc.text(`Score: ${percentage.toFixed(0)}%`, centerX, 380, { align: "center" });
     doc.text(`Date: ${date}`, centerX, 410, { align: "center" });
 
     doc.setFontSize(16);
