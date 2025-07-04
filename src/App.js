@@ -12,7 +12,7 @@ import fontkit from '@pdf-lib/fontkit';
 // const QUESTIONS_URL = `${process.env.PUBLIC_URL}/questions.json`;
 const QUESTIONS_URL = "/questions.json";
 
-const PASS_MARK = 10;
+const PASS_MARK = 90;
 const ADMIN_NAMES = ["joseph-admin", "queenie-admin"];
 
 function App() {
@@ -32,6 +32,8 @@ function App() {
   const [insertError, setInsertError] = useState(null);
   const [historyPage, setHistoryPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
+  const [loading, setLoading] = useState(false);
+
 
   const departments = [
     "BD/SLP-CO2", "C/TXR-CN-D4", "GR/FCM-Shz", "GS/OBR23-APAC17", "GS/OSD4-APAC16",
@@ -241,18 +243,19 @@ function App() {
             styles={{
               container: (base) => ({
                 ...base,
-                width: "277px",
+                width: "275px",
                 borderRadius: "12px",
                 textAlign: "left",
-                left: "15%",
+                left: "3%",
                 color:"black"
               }),
               control: (base) => ({
                 ...base,
                 borderRadius: "8px",
+                fontSize: "12px",
                 textAlign: "left",
                 minHeight: "40px",
-                paddingLeft: "10px", // this helps left-align the placeholder
+                paddingLeft: "5px", // this helps left-align the placeholder
               }),
               placeholder: (base) => ({
                 ...base,
@@ -413,20 +416,60 @@ function App() {
     );
   }
 
+  
+
+
 
   if (submitted) {
     const percentage = (score / questions.length) * 100;
     const passed = percentage >= PASS_MARK;
     const wrongAnswers = questions.filter((q, i) => !isAnswerCorrect(q, answers[i]));
 
+    
+
     return (
       <div className="result-screen">
         {/* Top Toolbar */}
+
+        {loading && (
+          <div style={{
+            position: 'fixed',
+            top: 0, left: 0,
+            width: '100vw',
+            height: '100vh',
+            backgroundColor: 'rgba(255, 255, 255, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999
+          }}>
+            <img src="/loading.gif" alt="Loading..." style={{ width: '80px', height: '80px' }} />
+            {/* You can also use a spinner icon or animation instead of an image */}
+          </div>
+        )}
         
         {passed && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap:'5px' }}>
           <button className="submit-button" onClick={() => setShowCertImage(true)}>🖼️ 查看证书</button>
-          <button className="submit-button" onClick={() => generateCertificate(name, score, questions.length, department)}>📄 下载证书</button>
+          
+          <button
+            className="submit-button"
+            onClick={() => {
+              setLoading(true);
+              // Let React render the loading spinner first
+              setTimeout(async () => {
+                try {
+                  await generateCertificate(name, score, questions.length, department);
+                } finally {
+                  setLoading(false);
+                }
+              }, 0);
+            }}
+          >
+            📄 下载证书
+          </button>
+
+
           
         </div>
         )}

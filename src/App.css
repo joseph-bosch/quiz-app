@@ -341,15 +341,21 @@ body, html {
   background: #ff4d4d;
 }
 
-@media (min-width: 100px) and (max-width: 600px) {
+@media (min-width: 100px) and (max-width: 400px) {
   .certificate-overlay-text {
-    font-size: 0.2rem;
+    font-size: 0.5rem;
+    line-height: 0.2rem;
     width: 90%;
-    top: 20%; /* tweak for better fit */
+    top: 30%; /* tweak for better fit */
   }
 
   .certificate-overlay-text h2 {
     font-size: 0.8rem;
+  }
+
+  .certificate-overlay-text p {
+    font-size: 0.6rem;
+    /* line-height: 0.2rem; */
   }
 }
 
