@@ -3,12 +3,13 @@ import React, { useState, useEffect } from "react";
 import { supabase } from './supabaseClient';
 import * as XLSX from "xlsx";
 import "./App.css";
+import jsPDF from "jspdf";
 
 // const QUESTIONS_URL = `${process.env.PUBLIC_URL}/questions.json`;
 const QUESTIONS_URL = "/questions.json";
 
 const PASS_MARK = 90;
-const ADMIN_NAMES = ["joseph", "queenie"];
+const ADMIN_NAMES = ["joseph-admin", "queenie-admin"];
 
 function App() {
   const [welcomeComplete, setWelcomeComplete] = useState(false);
@@ -19,6 +20,7 @@ function App() {
   const [score, setScore] = useState(0);
   // const [name, setName] = useState("");
   const [firstName, setFirstName] = useState("");
+  const [showCertImage, setShowCertImage] = useState(false);
   const [lastName, setLastName] = useState("");
   const [employeeNo, setEmployeeNo] = useState("");
   const [started, setStarted] = useState(false);
@@ -371,6 +373,42 @@ function App() {
 
     return (
       <div className="result-screen">
+        {/* Top Toolbar */}
+        
+        {passed && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+          <button className="submit-button" onClick={() => setShowCertImage(true)}>🖼️ 查看证书</button>
+          <button className="submit-button" onClick={() => generateCertificate(name, score, questions.length)}>📄 下载证书</button>
+          
+        </div>
+        )}
+
+        {showCertImage && (
+          <div className="certificate-modal">
+            <div className="certificate-content">
+              <span className="close-button" onClick={() => setShowCertImage(false)}>×</span>
+              <div style={{ position: 'relative' }}>
+                <img src="/images/certCompleted.jpg" alt="Certificate" />
+                <div className="certificate-overlay-text">
+                  <p>This is to certify that</p>
+                  <h2 style={{ fontWeight: "bold" }}>{name}</h2>
+                  <p>has successfully completed the MA Strategy quiz.</p>
+                  <p>Score: {score} / {questions.length}</p>
+                  <p>Date: {new Date().toLocaleDateString()}</p>
+                  <p>Bosch Automotive Products (Shenzhen) </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+
+        {/* Certificate Image */}
+        {showCertImage && (
+          <div style={{ textAlign: 'center' }}>
+            <img src="/images/certCompleted.jpg" alt="Certificate" style={{ maxWidth: '100%' }} />
+          </div>
+        )}
         <h2>📊 测验结果</h2>
         <p>你的分数: {score} / {questions.length} ({percentage.toFixed(0)}%)</p>
         <p style={{ color: passed ? "green" : "red", fontWeight: "bold", fontSize: "1.5rem" }}>
@@ -399,6 +437,8 @@ function App() {
           setStarted(true);
           loadShuffledQuestions();
         }}>🔁 再挑战</button>
+       
+
         <button className="submit-button" style={{ backgroundColor: '#dc3545' }} onClick={resetQuiz}>⏹ 结束</button>
       </div>
     );
@@ -490,5 +530,54 @@ function App() {
 );
 
 }
+
+
+
+const generateCertificate = async (name, score, total) => {
+  const doc = new jsPDF({
+    orientation: "landscape",     // Better certificate layout
+    unit: "pt",
+    format: [842, 595]            // A4 landscape size in points (≈ 11.69 × 8.27 in)
+  });
+
+  // Load background image
+  const img = new Image();
+  img.src = "/images/certCompleted.jpg";
+
+  img.onload = () => {
+    doc.addImage(img, "JPEG", 0, 0, 842, 595); // Fit to full canvas
+
+    const centerX = 842 / 2;
+    const date = new Date().toLocaleDateString();
+
+    doc.setFont("Helvetica", "normal");
+    doc.setFontSize(20);
+    doc.text("This is to certify that", centerX, 260, { align: "center" });
+
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(32);
+    doc.text(name, centerX, 300, { align: "center" });
+
+    doc.setFont("Helvetica", "normal");
+    doc.setFontSize(20);
+    doc.text("has successfully completed the MA Strategy quiz.", centerX, 340, { align: "center" });
+
+    doc.setFontSize(18);
+    doc.text(`Score: ${score} / ${total}`, centerX, 380, { align: "center" });
+    doc.text(`Date: ${date}`, centerX, 410, { align: "center" });
+
+    doc.setFontSize(16);
+    doc.text("Bosch Automotive Products (Shenzhen)", centerX, 470, { align: "center" });
+
+    doc.save(`Certificate-${name}.pdf`);
+  };
+
+  img.onerror = (e) => {
+    console.error("Failed to load certificate background image", e);
+  };
+};
+
+
+
 
 export default App;
