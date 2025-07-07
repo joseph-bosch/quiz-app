@@ -176,7 +176,7 @@ function App() {
   const exportToExcel = () => {
     const worksheet = XLSX.utils.json_to_sheet(allHistory.map(row => ({
       Name: row.name,
-      "Employee No": row.employee_no || '',
+      "Employee No": row.emp_num || '',
       Score: row.score,
       Total: row.total,
       Result: row.pass ? "Pass" : "Fail",
