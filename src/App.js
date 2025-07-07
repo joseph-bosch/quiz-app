@@ -33,6 +33,7 @@ function App() {
   const [historyPage, setHistoryPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
   const [loading, setLoading] = useState(false);
+  const [employeeError, setEmployeeError] = useState("");
 
 
   const departments = [
@@ -232,12 +233,28 @@ function App() {
           <input
             type="text"
             value={employeeNo}
-            onChange={(e) => setEmployeeNo(e.target.value)}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (/^\d*$/.test(value)) {
+                setEmployeeNo(value);
+                if (value.length < 8) {
+                  setEmployeeError("工号必须至少8位数字");
+                } else {
+                  setEmployeeError(""); // Clear error
+                }
+              }
+            }}
             placeholder="工号"
-            style={{width: "250px"}} 
+            style={{ width: "250px" }}
           />
+
+          {/* Inline error message */}
+          {employeeError && (
+            <p style={{ color: "red", fontSize: "12px", margin: "4px 0 10px 0" }}>{employeeError}</p>
+          )}
           <Select
             options={departments}
+            value={departments.find((d) => d.value === department)}
             placeholder="选择部门"
             onChange={(selected) => setDepartment(selected ? selected.value : "")}
             styles={{
@@ -281,9 +298,25 @@ function App() {
           />
           <br></br>
           <button
-            onClick={() =>
-              department.trim() && name.trim() && employeeNo.trim() && setStarted(true)
+            onClick={() => setStarted(true)}
+            disabled={
+              !department.trim() ||
+              !name.trim() ||
+              employeeNo.length < 8
             }
+            style={{
+              backgroundColor:
+                !department.trim() || !name.trim() || employeeNo.length < 8
+                  ? "#ccc"
+                  : "#4CAF50",
+              color: "white",
+              padding: "8px 16px",
+              border: "none",
+              cursor:
+                !department.trim() || !name.trim() || employeeNo.length < 8
+                  ? "not-allowed"
+                  : "pointer",
+            }}
           >
             开始测验
           </button>
