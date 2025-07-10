@@ -1,0 +1,99 @@
+.voice-page {
+  padding: 20px;
+  max-width: 900px;
+  margin: auto;
+  font-family: Arial, sans-serif;
+}
+
+.voice-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.voice-header h2 {
+  font-size: 28px;
+  margin: 0;
+}
+
+.upload-section {
+  margin-bottom: 30px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.audio-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.audio-item {
+  border: 1px solid #ccc;
+  border-radius: 12px;
+  padding: 16px;
+  background-color: #f9f9f9;
+  box-shadow: 2px 4px 8px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  transition: background-color 0.3s ease;
+}
+
+.audio-item.listened {
+  background-color: #e0ffe0;
+}
+
+.audio-item strong {
+  font-size: 16px;
+  color: #333;
+}
+
+.audio-item audio {
+  width: 100%;
+}
+
+.audio-item .delete-button {
+  margin-top: auto;
+  padding: 6px 10px;
+  background-color: #ff4d4d;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.audio-item .delete-button:hover {
+  background-color: #e60000;
+}
+
+.audio-item .progress-details {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #666;
+}
+
+.upload-progress-bar {
+  width: 100%;
+  height: 10px;
+  background: #ddd;
+  border-radius: 5px;
+  margin-top: 5px;
+  overflow: hidden;
+}
+
+.upload-progress-fill {
+  height: 100%;
+  background: #4caf50;
+  transition: width 0.3s ease;
+}
+
+.upload-status {
+  margin-top: 5px;
+  font-size: 0.9rem;
+}

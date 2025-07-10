@@ -4,6 +4,8 @@ import Select from "react-select";
 import { supabase } from './supabaseClient';
 import * as XLSX from "xlsx";
 import "./App.css";
+import VoicePage from './VoicePage';
+
 
 import { PDFDocument, rgb } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
@@ -34,6 +36,7 @@ function App() {
   const ITEMS_PER_PAGE = 10;
   const [loading, setLoading] = useState(false);
   const [employeeError, setEmployeeError] = useState("");
+  const [showVoicePage, setShowVoicePage] = useState(false);
 
 
   const departments = [
@@ -49,6 +52,8 @@ function App() {
   ].map((dept) => ({ value: dept, label: dept }));
 
   // const name = `${firstName.trim()} ${lastName.trim()}`.trim();
+  const isAdmin = ADMIN_NAMES.includes(name.trim().toLowerCase());
+
   const thStyle = {
     padding: "0.75rem",
     borderBottom: "1px solid #ccc",
@@ -59,6 +64,8 @@ function App() {
     padding: "0.75rem",
     borderBottom: "1px solid #eee",
   };
+
+  
 
   const loadShuffledQuestions = () => {
     fetch(QUESTIONS_URL)
@@ -186,6 +193,16 @@ function App() {
     XLSX.utils.book_append_sheet(workbook, worksheet, "QuizHistory");
     XLSX.writeFile(workbook, "Quiz_History.xlsx");
   };
+
+  if (showVoicePage) {
+    return (
+      <VoicePage
+        empNum={employeeNo}
+        isAdmin={isAdmin}
+        onBack={() => setShowVoicePage(false)}
+      />
+    );
+  }
 
   if (!welcomeComplete && !showHistory) {
     return (
@@ -323,6 +340,23 @@ function App() {
           {ADMIN_NAMES.includes(name.trim().toLowerCase()) && (
             <button onClick={() => setShowHistory(true)}>查看记录</button>
           )}
+
+          {employeeNo.length >= 8 && (
+            <button
+              style={{
+                backgroundColor: "#2196f3",
+                color: "white",
+                padding: "8px 16px",
+                border: "none",
+                cursor: "pointer",
+                marginTop: "10px"
+              }}
+              onClick={() => setShowVoicePage(true)}
+            >
+              🎧 听语音
+            </button>
+          )}
+
         </div>
       </div>
     );
