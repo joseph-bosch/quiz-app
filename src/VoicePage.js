@@ -161,11 +161,7 @@ function VoicePage({ empNum, isAdmin, onBack }) {
 
       {isAdmin && (
         <div className="upload-section">
-          <input
-            type="file"
-            accept="audio/*"
-            onChange={(e) => setSelectedFile(e.target.files[0])}
-          />
+          <input type="file" onChange={(e) => setSelectedFile(e.target.files[0])} />
 
           <button onClick={handleUpload} disabled={uploading || !selectedFile}>
             {uploading ? `Uploading (${uploadProgress}%)...` : "Upload Audio"}
