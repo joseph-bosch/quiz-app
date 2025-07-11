@@ -341,7 +341,7 @@ function App() {
             <button onClick={() => setShowHistory(true)}>查看记录</button>
           )}
 
-          {employeeNo.length >= 8 && (
+          {ADMIN_NAMES.includes(name.trim().toLowerCase()) && employeeNo.length >= 8 && (
             <button
               style={{
                 backgroundColor: "#2196f3",
