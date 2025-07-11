@@ -52,34 +52,40 @@ function VoicePage({ empNum, isAdmin, onBack }) {
     if (!selectedFile) return;
 
     setUploading(true);
-    setUploadProgress(0);
     setUploadStatus("");
+    setUploadProgress(0);
 
     try {
-        const formData = new FormData();
-        formData.append("file", selectedFile);
+      const formData = new FormData();
+      formData.append("file", selectedFile);
 
-        const response = await fetch("https://epdnvsarvkucabnntbws.supabase.co/functions/v1/upload-audio", {
-        method: "POST",
-        body: formData,
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-        throw new Error(result.error || "Upload failed");
+      const response = await fetch(
+        "https://epdnvsarvkucabnntbws.supabase.co/functions/v1/upload-audio",
+        {
+          method: "POST",
+          body: formData
         }
+      );
 
+      const result = await response.json();
+
+      if (!response.ok) {
+        setUploadStatus("❌ Upload failed: " + result.error);
+      } else {
         setUploadStatus("✅ Upload successful!");
         setRefreshTrigger((prev) => prev + 1);
         setSelectedFile(null);
-    } catch (error) {
-        console.error("Upload error:", error);
-        setUploadStatus("❌ Upload failed: " + error.message);
+      }
+    } catch (err) {
+      setUploadStatus("❌ Upload error: " + err.message);
     } finally {
-        setUploading(false);
+      setUploading(false);
     }
   };
+
+
+
+
 
 
   const handleDelete = async (fileName) => {

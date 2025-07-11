@@ -4,7 +4,7 @@ import Select from "react-select";
 import { supabase } from './supabaseClient';
 import * as XLSX from "xlsx";
 import "./App.css";
-// import VoicePage from './VoicePage';
+import VoicePage from './VoicePage';
 
 
 import { PDFDocument, rgb } from 'pdf-lib';
@@ -194,15 +194,15 @@ function App() {
     XLSX.writeFile(workbook, "Quiz_History.xlsx");
   };
 
-  // if (showVoicePage) {
-  //   return (
-  //     <VoicePage
-  //       empNum={employeeNo}
-  //       isAdmin={isAdmin}
-  //       onBack={() => setShowVoicePage(false)}
-  //     />
-  //   );
-  // }
+  if (showVoicePage) {
+    return (
+      <VoicePage
+        empNum={employeeNo}
+        isAdmin={isAdmin}
+        onBack={() => setShowVoicePage(false)}
+      />
+    );
+  }
 
   if (!welcomeComplete && !showHistory) {
     return (
@@ -341,7 +341,7 @@ function App() {
             <button onClick={() => setShowHistory(true)}>查看记录</button>
           )}
 
-          {/* {employeeNo.length >= 8 && (
+          {employeeNo.length >= 8 && (
             <button
               style={{
                 backgroundColor: "#2196f3",
@@ -355,7 +355,7 @@ function App() {
             >
               🎧 听语音
             </button>
-          )} */}
+          )}
 
         </div>
       </div>
