@@ -68,6 +68,7 @@ function VoicePage({ empNum, isAdmin, onBack }) {
       );
 
       const result = await response.json();
+      const storedFileName = result.fileName;
 
       if (!response.ok) {
         setUploadStatus("❌ Upload failed: " + result.error);
