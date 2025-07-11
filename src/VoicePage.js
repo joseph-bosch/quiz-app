@@ -1,6 +1,6 @@
 // VoicePage.js
 import React, { useEffect, useState, useRef } from "react";
-import { supabase, supabaseUrl, supabaseKey } from './supabaseClient';
+import { supabase } from './supabaseClient';
 import "./VoicePage.css";
 
 function VoicePage({ empNum, isAdmin, onBack }) {
@@ -49,28 +49,37 @@ function VoicePage({ empNum, isAdmin, onBack }) {
   };
 
   const handleUpload = async () => {
-  if (!selectedFile) return;
+    if (!selectedFile) return;
 
-  setUploading(true);
-  try {
-    const { data, error } = await supabase.storage
-      .from("voice-audios") // Make sure 'voice_audios' is your bucket name
-      .upload(selectedFile.name, selectedFile, {
-        cacheControl: "3600",
-        upsert: true, // Optional: allows overwriting files with the same name
-      });
+    setUploading(true);
+    setUploadProgress(0);
+    setUploadStatus("");
 
-    if (error) throw error;
+    try {
+        const formData = new FormData();
+        formData.append("file", selectedFile);
 
-    setRefreshTrigger((prev) => prev + 1); // Refresh after upload
-    setSelectedFile(null); // Clear selected file
-  } catch (error) {
-    alert("Upload failed: " + error.message);
-  } finally {
-    setUploading(false);
-  }
-};
+        const response = await fetch("https://epdnvsarvkucabnntbws.supabase.co/functions/v1/upload-audio", {
+        method: "POST",
+        body: formData,
+        });
 
+        const result = await response.json();
+
+        if (!response.ok) {
+        throw new Error(result.error || "Upload failed");
+        }
+
+        setUploadStatus("✅ Upload successful!");
+        setRefreshTrigger((prev) => prev + 1);
+        setSelectedFile(null);
+    } catch (error) {
+        console.error("Upload error:", error);
+        setUploadStatus("❌ Upload failed: " + error.message);
+    } finally {
+        setUploading(false);
+    }
+  };
 
 
   const handleDelete = async (fileName) => {
@@ -91,7 +100,7 @@ function VoicePage({ empNum, isAdmin, onBack }) {
       const totalDuration = audioElement.duration;
       const isCompleted = listenedSeconds >= totalDuration * 0.95;
 
-      const { data: existing, error: fetchError } = await supabase
+      const { data: existing } = await supabase
         .from("audio_progress")
         .select("id")
         .eq("emp_num", empNum)
@@ -99,22 +108,19 @@ function VoicePage({ empNum, isAdmin, onBack }) {
         .maybeSingle();
 
       if (existing) {
-        const { error: updateError } = await supabase
+        await supabase
           .from("audio_progress")
           .update({ duration: listenedSeconds, completed: isCompleted })
           .eq("id", existing.id);
-        if (updateError) console.error("Update error:", updateError.message);
-        else setRefreshTrigger((x) => x + 1);
       } else {
-        const { error: insertError } = await supabase.from("audio_progress").insert({
+        await supabase.from("audio_progress").insert({
           emp_num: empNum,
           audio_name: audio.name,
           duration: listenedSeconds,
           completed: isCompleted,
         });
-        if (insertError) console.error("Insert error:", insertError.message);
-        else setRefreshTrigger((x) => x + 1);
       }
+      setRefreshTrigger((x) => x + 1);
 
       audioElement.removeEventListener("pause", handleEndedOrPaused);
       audioElement.removeEventListener("ended", handleEndedOrPaused);
@@ -144,28 +150,27 @@ function VoicePage({ empNum, isAdmin, onBack }) {
 
       {isAdmin && (
         <div className="upload-section">
-            <input
+          <input
             type="file"
             accept="audio/*"
             onChange={(e) => setSelectedFile(e.target.files[0])}
-            />
-            <button onClick={handleUpload} disabled={uploading || !selectedFile}>
+          />
+          <button onClick={handleUpload} disabled={uploading || !selectedFile}>
             {uploading ? `Uploading (${uploadProgress}%)...` : "Upload Audio"}
-            </button>
+          </button>
 
-            {uploading && (
+          {uploading && (
             <div className="upload-progress-bar">
-                <div
+              <div
                 className="upload-progress-fill"
                 style={{ width: `${uploadProgress}%` }}
-                ></div>
+              ></div>
             </div>
-            )}
+          )}
 
-            {uploadStatus && <div className="upload-status">{uploadStatus}</div>}
+          {uploadStatus && <div className="upload-status">{uploadStatus}</div>}
         </div>
-        )}
-
+      )}
 
       <div className="audio-list">
         {audios.map((audio) => {
