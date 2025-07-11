@@ -52,37 +52,41 @@ function VoicePage({ empNum, isAdmin, onBack }) {
     if (!selectedFile) return;
 
     setUploading(true);
-    setUploadStatus("");
     setUploadProgress(0);
+    setUploadStatus("");
 
-    try {
-      const formData = new FormData();
-      formData.append("file", selectedFile);
+    const formData = new FormData();
+    formData.append("file", selectedFile);
 
-      const response = await fetch(
-        "https://epdnvsarvkucabnntbws.supabase.co/functions/v1/upload-audio",
-        {
-          method: "POST",
-          body: formData
-        }
-      );
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "https://epdnvsarvkucabnntbws.supabase.co/functions/v1/upload-audio");
 
-      const result = await response.json();
-      const storedFileName = result.fileName;
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percentComplete = Math.round((event.loaded / event.total) * 100);
+        setUploadProgress(percentComplete);
+      }
+    };
 
-      if (!response.ok) {
-        setUploadStatus("❌ Upload failed: " + result.error);
-      } else {
+    xhr.onload = () => {
+      if (xhr.status === 200) {
         setUploadStatus("✅ Upload successful!");
         setRefreshTrigger((prev) => prev + 1);
         setSelectedFile(null);
+      } else {
+        setUploadStatus("❌ Upload failed: " + xhr.responseText);
       }
-    } catch (err) {
-      setUploadStatus("❌ Upload error: " + err.message);
-    } finally {
       setUploading(false);
-    }
+    };
+
+    xhr.onerror = () => {
+      setUploadStatus("❌ Upload error");
+      setUploading(false);
+    };
+
+    xhr.send(formData);
   };
+
 
 
 
@@ -157,24 +161,35 @@ function VoicePage({ empNum, isAdmin, onBack }) {
 
       {isAdmin && (
         <div className="upload-section">
-          <input type="file" onChange={(e) => setSelectedFile(e.target.files[0])} />
+          <input
+            type="file"
+            accept="audio/*"
+            onChange={(e) => setSelectedFile(e.target.files[0])}
+          />
 
           <button onClick={handleUpload} disabled={uploading || !selectedFile}>
             {uploading ? `Uploading (${uploadProgress}%)...` : "Upload Audio"}
           </button>
 
+          {/* Move this to a new line */}
           {uploading && (
-            <div className="upload-progress-bar">
+            <div className="upload-progress-bar" style={{ marginTop: "10px" }}>
               <div
                 className="upload-progress-fill"
-                style={{ width: `${uploadProgress}%` }}
-              ></div>
+                style={{
+                  width: `${uploadProgress}%`,
+                  height: "8px",
+                  backgroundColor: "#4caf50",
+                  transition: "width 0.3s",
+                }}
+              />
             </div>
           )}
 
           {uploadStatus && <div className="upload-status">{uploadStatus}</div>}
         </div>
       )}
+
 
       <div className="audio-list">
         {audios.map((audio) => {
@@ -194,7 +209,7 @@ function VoicePage({ empNum, isAdmin, onBack }) {
               </audio>
 
               <div className="progress-details">
-                <div>{p.current ? `${Math.floor(p.current)}s` : "0s"} / {p.total ? `${Math.floor(p.total)}s` : "--"}</div>
+                {/* <div>{p.current ? `${Math.floor(p.current)}s` : "0s"} / {p.total ? `${Math.floor(p.total)}s` : "--"}</div> */}
                 <div>{p.total ? `${Math.floor(p.total - p.current)}s left` : ""}</div>
               </div>
 
