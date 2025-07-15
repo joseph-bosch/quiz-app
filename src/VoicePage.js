@@ -1,22 +1,52 @@
 // VoicePage.js
 import React, { useEffect, useState, useRef } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from './supabaseClient';
+import { QRCodeCanvas } from "qrcode.react";
 import "./VoicePage.css";
 
-function VoicePage({ empNum, isAdmin, onBack }) {
+function VoicePage({ empNum, isAdmin }) {
+  const { audioName } = useParams();
+  const navigate = useNavigate();
   const [audios, setAudios] = useState([]);
   const [listened, setListened] = useState({});
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [progress, setProgress] = useState({});
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState("");
+  const [notFound, setNotFound] = useState(false);
+  const [showQR, setShowQR] = useState({});
+  const audioRefs = useRef({});
 
   useEffect(() => {
     fetchAudios();
     fetchListened();
-  }, [refreshTrigger]);
+  }, []);
+
+  useEffect(() => {
+    const tryAutoPlay = () => {
+      if (!audioName || audios.length === 0) return;
+      const matchingAudio = audios.find((a) => a.name.replace(/\.[^/.]+$/, "") === audioName);
+      const isCompleted = matchingAudio && listened[matchingAudio.name]?.completed;
+      const audioEl = matchingAudio && audioRefs.current[matchingAudio.name];
+
+      if (matchingAudio && audioEl && !isCompleted) {
+        audioEl.play().catch(() => {
+          const resumeOnInteraction = () => {
+            audioEl.play().finally(() => {
+              window.removeEventListener("click", resumeOnInteraction);
+              window.removeEventListener("keydown", resumeOnInteraction);
+            });
+          };
+          window.addEventListener("click", resumeOnInteraction);
+          window.addEventListener("keydown", resumeOnInteraction);
+        });
+      }
+    };
+
+    tryAutoPlay();
+  }, [audios, audioName, listened]);
 
   const fetchAudios = async () => {
     const { data, error } = await supabase.storage.from("voice-audios").list("", {
@@ -30,7 +60,11 @@ function VoicePage({ empNum, isAdmin, onBack }) {
           return { name: file.name, url: publicUrlData.publicUrl };
         })
       );
-      setAudios(urls);
+      const filtered = audioName
+        ? urls.filter((file) => file.name.replace(/\.[^/.]+$/, "") === audioName)
+        : urls;
+      setAudios(filtered);
+      setNotFound(audioName && filtered.length === 0);
     }
   };
 
@@ -71,7 +105,7 @@ function VoicePage({ empNum, isAdmin, onBack }) {
     xhr.onload = () => {
       if (xhr.status === 200) {
         setUploadStatus("✅ Upload successful!");
-        setRefreshTrigger((prev) => prev + 1);
+        fetchAudios();
         setSelectedFile(null);
       } else {
         setUploadStatus("❌ Upload failed: " + xhr.responseText);
@@ -87,18 +121,12 @@ function VoicePage({ empNum, isAdmin, onBack }) {
     xhr.send(formData);
   };
 
-
-
-
-
-
-
   const handleDelete = async (fileName) => {
     const confirmed = window.confirm(`Are you sure you want to delete ${fileName}?`);
     if (!confirmed) return;
     const { error } = await supabase.storage.from("voice-audios").remove([fileName]);
     if (!error) {
-      setRefreshTrigger((x) => x + 1);
+      fetchAudios();
     }
   };
 
@@ -131,7 +159,14 @@ function VoicePage({ empNum, isAdmin, onBack }) {
           completed: isCompleted,
         });
       }
-      setRefreshTrigger((x) => x + 1);
+
+      const updated = { ...listened };
+      updated[audio.name] = {
+        ...(updated[audio.name] || {}),
+        duration: listenedSeconds,
+        completed: isCompleted,
+      };
+      setListened(updated);
 
       audioElement.removeEventListener("pause", handleEndedOrPaused);
       audioElement.removeEventListener("ended", handleEndedOrPaused);
@@ -152,80 +187,114 @@ function VoicePage({ empNum, isAdmin, onBack }) {
     }));
   };
 
+  const handleBack = () => {
+    if (audioName) {
+      navigate("/audioPage");
+    } else {
+      navigate("/");
+    }
+  };
+
+  const toggleQR = (audio) => {
+    setShowQR((prev) => ({
+      ...prev,
+      [audio.name]: !prev[audio.name],
+    }));
+  };
+
   return (
     <div className="voice-page">
       <div className="voice-header">
         <h2>🎧 Audio Learning</h2>
-        <button onClick={onBack}>🔙 Back</button>
+        <button onClick={handleBack}>🔙 Back</button>
       </div>
 
-      {isAdmin && (
-        <div className="upload-section">
-          <input type="file" onChange={(e) => setSelectedFile(e.target.files[0])} />
+      {notFound ? (
+        <div style={{ padding: "1rem", color: "red" }}>
+          ❌ No audio found with the name "{audioName}".
+          <br />
+          <button onClick={() => navigate("/audioPage")}>Go Back to All Audio</button>
+        </div>
+      ) : (
+        <>
+          {isAdmin && (
+            <div className="upload-section">
+              <input type="file" onChange={(e) => setSelectedFile(e.target.files[0])} />
 
-          <button onClick={handleUpload} disabled={uploading || !selectedFile}>
-            {uploading ? `Uploading (${uploadProgress}%)...` : "Upload Audio"}
-          </button>
+              <button onClick={handleUpload} disabled={uploading || !selectedFile}>
+                {uploading ? `Uploading (${uploadProgress}%)...` : "Upload Audio"}
+              </button>
 
-          {/* Move this to a new line */}
-          {uploading && (
-            <div className="upload-progress-bar" style={{ marginTop: "10px" }}>
-              <div
-                className="upload-progress-fill"
-                style={{
-                  width: `${uploadProgress}%`,
-                  height: "8px",
-                  backgroundColor: "#4caf50",
-                  transition: "width 0.3s",
-                }}
-              />
+              {uploading && (
+                <div className="upload-progress-bar" style={{ marginTop: "10px" }}>
+                  <div
+                    className="upload-progress-fill"
+                    style={{
+                      width: `${uploadProgress}%`,
+                      height: "8px",
+                      backgroundColor: "#4caf50",
+                      transition: "width 0.3s",
+                    }}
+                  />
+                </div>
+              )}
+
+              {uploadStatus && <div className="upload-status">{uploadStatus}</div>}
             </div>
           )}
 
-          {uploadStatus && <div className="upload-status">{uploadStatus}</div>}
-        </div>
+          <div className="audio-list">
+            {audios.map((audio) => {
+              const listenedEntry = listened[audio.name];
+              const listenedClass = listenedEntry?.completed ? "listened" : "";
+              const p = progress[audio.name] || {};
+              const cleanName = audio.name.replace(/\.[^/.]+$/, "");
+              const qrUrl = `${window.location.origin}/audioPage/${cleanName}`;
+
+              return (
+                <div key={audio.name} className={`audio-item ${listenedClass}`}>
+                  <strong>{audio.name}</strong>
+                  <audio
+                    controls
+                    ref={(el) => (audioRefs.current[audio.name] = el)}
+                    onPlay={(e) => handleListen(audio, e.target)}
+                    onTimeUpdate={(e) => updateProgress(audio.name, e.target.currentTime, e.target.duration)}
+                  >
+                    <source src={audio.url} type="audio/mpeg" />
+                  </audio>
+
+                  <div className="progress-details">
+                    <div>{p.total ? `${Math.floor(p.total - p.current)}s left` : ""}</div>
+                  </div>
+
+                  <div className="progress-bar-container">
+                    <div className="progress-bar" style={{ width: `${p.percent || 0}%` }}></div>
+                  </div>
+
+                  {isAdmin && (
+                    <>
+                      <button className="delete-button" onClick={() => handleDelete(audio.name)}>
+                        🗑️ Delete
+                      </button>
+                      <button className="qrCode-button" onClick={() => toggleQR(audio)}>📷 Create QR Code</button>
+                      {showQR[audio.name] && (
+                        <div style={{ marginTop: "10px" }}>
+                          <QRCodeCanvas value={qrUrl} size={128} />
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {listenedEntry?.completed && <div>✅ Completed</div>}
+                  {!listenedEntry?.completed && listenedEntry?.duration > 0 && (
+                    <div>⏱️ Listened {listenedEntry.duration}s</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
-
-
-      <div className="audio-list">
-        {audios.map((audio) => {
-          const listenedEntry = listened[audio.name];
-          const listenedClass = listenedEntry?.completed ? "listened" : "";
-          const p = progress[audio.name] || {};
-
-          return (
-            <div key={audio.name} className={`audio-item ${listenedClass}`}>
-              <strong>{audio.name}</strong>
-              <audio
-                controls
-                onPlay={(e) => handleListen(audio, e.target)}
-                onTimeUpdate={(e) => updateProgress(audio.name, e.target.currentTime, e.target.duration)}
-              >
-                <source src={audio.url} type="audio/mpeg" />
-              </audio>
-
-              <div className="progress-details">
-                {/* <div>{p.current ? `${Math.floor(p.current)}s` : "0s"} / {p.total ? `${Math.floor(p.total)}s` : "--"}</div> */}
-                <div>{p.total ? `${Math.floor(p.total - p.current)}s left` : ""}</div>
-              </div>
-
-              <div className="progress-bar-container">
-                <div className="progress-bar" style={{ width: `${p.percent || 0}%` }}></div>
-              </div>
-
-              {isAdmin && (
-                <button className="delete-button" onClick={() => handleDelete(audio.name)}>
-                  🗑️ Delete
-                </button>
-              )}
-              {listenedEntry?.completed && <div>✅ Completed</div>}
-              {!listenedEntry?.completed && listenedEntry?.duration > 0 && (
-                <div>⏱️ Listened {listenedEntry.duration}s</div>
-              )}
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }

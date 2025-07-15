@@ -71,6 +71,22 @@
   background-color: #e60000;
 }
 
+
+.audio-item .qrCode-button {
+  margin-top: auto;
+  padding: 6px 10px;
+  background-color: #4dcaff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.audio-item .qrCode-button:hover {
+  background-color: #92ade3;
+}
+
 .audio-item .progress-details {
   display: flex;
   justify-content: space-between;
