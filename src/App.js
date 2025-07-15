@@ -791,7 +791,7 @@
 
 // Updated App.js with routing support
 import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { HashRouter as Router, Route, Routes } from "react-router-dom";
 import QuizApp from "./QuizApp";
 import VoicePage from "./VoicePage";
 
@@ -801,7 +801,7 @@ function App() {
       <Routes>
         <Route path="/" element={<QuizApp />} />
         <Route path="/audioPage" element={<VoicePageWrapper />} />
-        <Route path="/audioPage/:audioName" element={<VoicePage />} />
+        <Route path="/audioPage/:audioName" element={<VoicePageWrapper />} />
       </Routes>
     </Router>
   );

@@ -249,7 +249,7 @@ function VoicePage({ empNum, isAdmin }) {
               const listenedClass = listenedEntry?.completed ? "listened" : "";
               const p = progress[audio.name] || {};
               const cleanName = audio.name.replace(/\.[^/.]+$/, "");
-              const qrUrl = `${window.location.origin}/audioPage/${cleanName}`;
+              const qrUrl = `${window.location.origin}/#/audioPage/${cleanName}`;
 
               return (
                 <div key={audio.name} className={`audio-item ${listenedClass}`}>
