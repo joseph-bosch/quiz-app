@@ -139,34 +139,37 @@ function VoicePage({ empNum, isAdmin }) {
       const totalDuration = audioElement.duration;
       const isCompleted = listenedSeconds >= totalDuration * 0.95;
 
-      const { data: existing } = await supabase
-        .from("audio_progress")
-        .select("id")
-        .eq("emp_num", empNum)
-        .eq("audio_name", audio.name)
-        .maybeSingle();
-
-      if (existing) {
-        await supabase
-          .from("audio_progress")
-          .update({ duration: listenedSeconds, completed: isCompleted })
-          .eq("id", existing.id);
-      } else {
-        await supabase.from("audio_progress").insert({
-          emp_num: empNum,
-          audio_name: audio.name,
-          duration: listenedSeconds,
-          completed: isCompleted,
-        });
-      }
-
       const updated = { ...listened };
       updated[audio.name] = {
         ...(updated[audio.name] || {}),
         duration: listenedSeconds,
         completed: isCompleted,
       };
-      setListened(updated);
+      setListened(updated); // ✅ Always update the UI
+
+      // ✅ Only write to Supabase if empNum is present
+      if (empNum) {
+        const { data: existing } = await supabase
+          .from("audio_progress")
+          .select("id")
+          .eq("emp_num", empNum)
+          .eq("audio_name", audio.name)
+          .maybeSingle();
+
+        if (existing) {
+          await supabase
+            .from("audio_progress")
+            .update({ duration: listenedSeconds, completed: isCompleted })
+            .eq("id", existing.id);
+        } else {
+          await supabase.from("audio_progress").insert({
+            emp_num: empNum,
+            audio_name: audio.name,
+            duration: listenedSeconds,
+            completed: isCompleted,
+          });
+        }
+      }
 
       audioElement.removeEventListener("pause", handleEndedOrPaused);
       audioElement.removeEventListener("ended", handleEndedOrPaused);
@@ -175,6 +178,7 @@ function VoicePage({ empNum, isAdmin }) {
     audioElement.addEventListener("pause", handleEndedOrPaused);
     audioElement.addEventListener("ended", handleEndedOrPaused);
   };
+
 
   const updateProgress = (audioName, current, total) => {
     setProgress((prev) => ({
