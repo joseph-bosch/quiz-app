@@ -209,15 +209,15 @@ function VoicePage({ empNum, isAdmin }) {
   return (
     <div className="voice-page">
       <div className="voice-header">
-        <h2>🎧 Audio Learning</h2>
-        <button onClick={handleBack}>🔙 Back</button>
+        <h2>🎧 收听音频</h2>
+        <button onClick={handleBack}>🔙 返回</button>
       </div>
 
       {notFound ? (
         <div style={{ padding: "1rem", color: "red" }}>
           ❌ No audio found with the name "{audioName}".
           <br />
-          <button onClick={() => navigate("/audioPage")}>Go Back to All Audio</button>
+          <button onClick={() => navigate("/audioPage")}>返回</button>
         </div>
       ) : (
         <>
@@ -226,7 +226,7 @@ function VoicePage({ empNum, isAdmin }) {
               <input type="file" onChange={(e) => setSelectedFile(e.target.files[0])} />
 
               <button onClick={handleUpload} disabled={uploading || !selectedFile}>
-                {uploading ? `Uploading (${uploadProgress}%)...` : "Upload Audio"}
+                {uploading ? `上传中 (${uploadProgress}%)...` : "上传音频"}
               </button>
 
               {uploading && (
@@ -268,19 +268,24 @@ function VoicePage({ empNum, isAdmin }) {
                   </audio>
 
                   <div className="progress-details">
-                    <div>{p.total ? `${Math.floor(p.total - p.current)}s left` : ""}</div>
+                    <div>{p.total ? `还剩 ${Math.floor(p.total - p.current)}秒` : ""}</div>
                   </div>
 
                   <div className="progress-bar-container">
                     <div className="progress-bar" style={{ width: `${p.percent || 0}%` }}></div>
                   </div>
 
+                  {listenedEntry?.completed && <div>✅ 完成了</div>}
+                  {!listenedEntry?.completed && listenedEntry?.duration > 0 && (
+                    <div>⏱️已听<b>{listenedEntry.duration}</b>秒</div>
+                  )}
+
                   {isAdmin && (
                     <>
                       <button className="delete-button" onClick={() => handleDelete(audio.name)}>
-                        🗑️ Delete
+                        🗑️ 删除
                       </button>
-                      <button className="qrCode-button" onClick={() => toggleQR(audio)}>📷 Create QR Code</button>
+                      <button className="qrCode-button" onClick={() => toggleQR(audio)}>📷 创建二维码</button>
                       {showQR[audio.name] && (
                         <div style={{ marginTop: "10px" }}>
                           <QRCodeCanvas value={qrUrl} size={128} />
@@ -289,10 +294,7 @@ function VoicePage({ empNum, isAdmin }) {
                     </>
                   )}
 
-                  {listenedEntry?.completed && <div>✅ Completed</div>}
-                  {!listenedEntry?.completed && listenedEntry?.duration > 0 && (
-                    <div>⏱️ Listened {listenedEntry.duration}s</div>
-                  )}
+                  
                 </div>
               );
             })}
