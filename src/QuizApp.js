@@ -10,7 +10,7 @@ import "./App.css";
 
 const QUESTIONS_URL = "/questions.json";
 const PASS_MARK = 90;
-const ADMIN_NAMES = ["joseph-admin", "queenie-admin"];
+const ADMIN_NAMES = ["olarinde joseph", "queenie-admin", "li dongqin"];
 
 const QuizApp = () => {
   const [questions, setQuestions] = useState([]);
