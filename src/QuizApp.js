@@ -3,7 +3,8 @@ import React, { useState, useEffect } from "react";
 import Select from "react-select";
 import { supabase } from "./supabaseClient";
 import * as XLSX from "xlsx";
-import VoicePage from "./VoicePage";
+import { useNavigate } from "react-router-dom"; // ✅ using router navigation
+// import VoicePage from "./VoicePage"; // ❌ remove (we will route to /audioPage)
 import { PDFDocument, rgb } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import "./App.css";
@@ -13,6 +14,7 @@ const PASS_MARK = 90;
 const ADMIN_NAMES = ["olarinde joseph", "queenie-admin", "li dongqin"];
 
 const QuizApp = () => {
+  const navigate = useNavigate(); // ✅ get navigate
   const [questions, setQuestions] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState({});
@@ -22,20 +24,19 @@ const QuizApp = () => {
   const [department, setDepartment] = useState("");
   const [employeeNo, setEmployeeNo] = useState(localStorage.getItem("employeeNo") || "");
   const [started, setStarted] = useState(false);
-  const [showVoicePage, setShowVoicePage] = useState(false);
+  // const [showVoicePage, setShowVoicePage] = useState(false); // ❌ remove
   const [welcomeComplete, setWelcomeComplete] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [historyData, setHistoryData] = useState([]);
   const [employeeError, setEmployeeError] = useState("");
   const [allHistory, setAllHistory] = useState([]);
-//   const [insertError, setInsertError] = useState(null);
   const [historyPage, setHistoryPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
   const [loading, setLoading] = useState(false);
   const [insertError, setInsertError] = useState(null);
   const [showCertImage, setShowCertImage] = useState(false);
 
-    const departments = [
+  const departments = [
     "BD/SLP-CO2", "C/TXR-CN-D4", "GR/FCM-Shz", "GS/OBR23-APAC17", "GS/OSD4-APAC16",
     "GS/PSD5-AP", "MA/HRL-Shz", "MA-WS/PAS-EAA-CN", "MA-WS/PAW-ENG1-CN", "MA-WS/PAW-ENG2-CN",
     "MA-WS/PAW-ENG3-CN", "MA-WS/PAW-ENG-CN", "MA-WS/PUQ1-Shz", "MA-WS/PUQ2-Shz", "MA-WS/PUQ-Shz",
@@ -47,7 +48,6 @@ const QuizApp = () => {
     "ShzP/TEF2"
   ].map((dept) => ({ value: dept, label: dept }));
 
-  // const name = `${firstName.trim()} ${lastName.trim()}`.trim();
   const isAdmin = ADMIN_NAMES.includes(name.trim().toLowerCase());
 
   const thStyle = {
@@ -106,15 +106,12 @@ const QuizApp = () => {
       const selected = answers[currentIndex] || [];
       let newSelected;
       if (selected.includes(option)) {
-        // Deselect option
         newSelected = selected.filter((item) => item !== option);
       } else {
-        // Select option
         newSelected = [...selected, option];
       }
       setAnswers({ ...answers, [currentIndex]: newSelected });
     } else {
-      // Single selection — select and move to next question after short delay
       setAnswers({ ...answers, [currentIndex]: option });
       setTimeout(() => {
         if (currentIndex < questions.length - 1) {
@@ -141,7 +138,6 @@ const QuizApp = () => {
   const isAnswerCorrect = (question, selected) => {
     if (Array.isArray(question.correct)) {
       if (!Array.isArray(selected)) return false;
-      // Exact match (order independent)
       const sortedSelected = [...selected].sort();
       const sortedCorrect = [...question.correct].sort();
       return JSON.stringify(sortedSelected) === JSON.stringify(sortedCorrect);
@@ -187,9 +183,10 @@ const QuizApp = () => {
     if (!error && data) setHistoryData(data);
   };
 
-  if (showVoicePage) {
-    return <VoicePage empNum={employeeNo} isAdmin={isAdmin} onBack={() => setShowVoicePage(false)} />;
-  }
+  // ❌ removed inline VoicePage rendering
+  // if (showVoicePage) {
+  //   return <VoicePage empNum={employeeNo} isAdmin={isAdmin} onBack={() => setShowVoicePage(false)} />;
+  // }
 
   if (showHistory) {
     const totalPages = Math.ceil(allHistory.length / ITEMS_PER_PAGE);
@@ -250,7 +247,6 @@ const QuizApp = () => {
                 <th style={thStyle}>Name</th>
                 <th style={thStyle}>Dept</th>
                 <th style={thStyle}>Score</th>
-                
                 <th style={thStyle}>Result</th>
                 <th style={thStyle}>Time</th>
               </tr>
@@ -262,7 +258,6 @@ const QuizApp = () => {
                   <td style={tdStyle}>{h.name}</td>
                   <td style={tdStyle}>{h.department}</td>
                   <td style={tdStyle}>{h.score}</td>
-                  
                   <td style={{ ...tdStyle, fontWeight: "bold", color: h.pass ? "green" : "red" }}>
                     {h.pass ? "✅ Pass" : "❌ Fail"}
                   </td>
@@ -334,12 +329,11 @@ const QuizApp = () => {
     );
   }
 
-    if (!started && !showHistory) {
+  if (!started && !showHistory) {
     return (
       <div
         className="quiz-screen"
         style={{
-          // background: `url('${process.env.PUBLIC_URL}/images/quiz.png') no-repeat center center / cover`,
           background: `url('/images/quiz.png') no-repeat center center / cover`,
           minHeight: '100vh'
         }}
@@ -357,7 +351,7 @@ const QuizApp = () => {
                 if (value.length < 8) {
                   setEmployeeError("工号必须至少8位数字");
                 } else {
-                  setEmployeeError(""); // Clear error
+                  setEmployeeError("");
                 }
               }
             }}
@@ -365,10 +359,10 @@ const QuizApp = () => {
             style={{ width: "250px" }}
           />
 
-          {/* Inline error message */}
           {employeeError && (
             <p style={{ color: "red", fontSize: "12px", margin: "4px 0 10px 0" }}>{employeeError}</p>
           )}
+
           <Select
             options={departments}
             value={departments.find((d) => d.value === department)}
@@ -380,8 +374,7 @@ const QuizApp = () => {
                 width: "275px",
                 borderRadius: "12px",
                 color: "black",
-                // Remove left, and rely on parent layout
-                margin: "0 auto", // if you want it centered
+                margin: "0 auto",
               }),
               control: (base) => ({
                 ...base,
@@ -399,28 +392,23 @@ const QuizApp = () => {
             }}
           />
 
-
-          {/* <input
-            type="text"
-            value={department}
-            onChange={(e) => setDepartment(e.target.value)}
-            placeholder="部门"
-          style={{width: "250px"}} /> */}
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="姓名"
-            style={{width: "250px"}} 
+            style={{ width: "250px" }}
           />
-          <br></br>
+          <br />
+
           <button
-            onClick={() => setStarted(true)}
-            disabled={
-              !department.trim() ||
-              !name.trim() ||
-              employeeNo.length < 8
-            }
+            onClick={() => {
+              // ✅ persist for later routes
+              localStorage.setItem("employeeNo", employeeNo);
+              localStorage.setItem("name", name);
+              setStarted(true);
+            }}
+            disabled={!department.trim() || !name.trim() || employeeNo.length < 8}
             style={{
               backgroundColor:
                 !department.trim() || !name.trim() || employeeNo.length < 8
@@ -437,6 +425,7 @@ const QuizApp = () => {
           >
             开始测验
           </button>
+
           {ADMIN_NAMES.includes(name.trim().toLowerCase()) && (
             <button onClick={() => setShowHistory(true)}>查看记录</button>
           )}
@@ -451,32 +440,28 @@ const QuizApp = () => {
                 cursor: "pointer",
                 marginTop: "10px"
               }}
-              onClick={() => setShowVoicePage(true)}
+              onClick={() => {
+                // ✅ persist then route to /audioPage
+                localStorage.setItem("employeeNo", employeeNo);
+                localStorage.setItem("name", name);
+                navigate("/audioPage");
+              }}
             >
               🎧 听语音
             </button>
           )}
-
         </div>
       </div>
     );
   }
-
-  
-
-
 
   if (submitted) {
     const percentage = (score / questions.length) * 100;
     const passed = percentage >= PASS_MARK;
     const wrongAnswers = questions.filter((q, i) => !isAnswerCorrect(q, answers[i]));
 
-    
-
     return (
       <div className="result-screen">
-        {/* Top Toolbar */}
-
         {loading && (
           <div style={{
             position: 'fixed',
@@ -490,34 +475,28 @@ const QuizApp = () => {
             zIndex: 9999
           }}>
             <img src="/loading.gif" alt="Loading..." style={{ width: '80px', height: '80px' }} />
-            {/* You can also use a spinner icon or animation instead of an image */}
           </div>
         )}
-        
+
         {passed && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap:'5px' }}>
-          <button className="submit-button" onClick={() => setShowCertImage(true)}>🖼️ 查看证书</button>
-          
-          <button
-            className="submit-button"
-            onClick={() => {
-              setLoading(true);
-              // Let React render the loading spinner first
-              setTimeout(async () => {
-                try {
-                  await generateCertificate(name, score, questions.length, department);
-                } finally {
-                  setLoading(false);
-                }
-              }, 0);
-            }}
-          >
-            📄 下载证书
-          </button>
-
-
-          
-        </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap: '5px' }}>
+            <button className="submit-button" onClick={() => setShowCertImage(true)}>🖼️ 查看证书</button>
+            <button
+              className="submit-button"
+              onClick={() => {
+                setLoading(true);
+                setTimeout(async () => {
+                  try {
+                    await generateCertificate(name, score, questions.length, department);
+                  } finally {
+                    setLoading(false);
+                  }
+                }, 0);
+              }}
+            >
+              📄 下载证书
+            </button>
+          </div>
         )}
 
         {showCertImage && (
@@ -525,37 +504,22 @@ const QuizApp = () => {
             <div className="certificate-content">
               <span className="close-button" onClick={() => setShowCertImage(false)}>×</span>
               <div className="certificate-overlay">
-                <img
-                  src="/images/certCompleted.jpg"
-                  alt="Certificate"
-                  className="certificate-image"
-                />
+                <img src="/images/certCompleted.jpg" alt="Certificate" className="certificate-image" />
                 <div className="certificate-overlay-text">
                   <p>This is to certify that</p>
                   <h2>{name} ({department})</h2>
                   <p>has successfully completed the MA Strategy quiz.</p>
-                  
-                  <div style={{ justifyContent: "center", gap: "20px", paddingBottom:"0px" }}>
+                  <div style={{ justifyContent: "center", gap: "20px", paddingBottom: "0px" }}>
                     <p>Score: {percentage.toFixed(0)}%</p>
                     <p>Date: {new Date().toLocaleDateString()}</p>
                   </div>
-
                   <p>Bosch Automotive Products (Shenzhen) Co., Ltd.</p>
                 </div>
-
               </div>
             </div>
           </div>
         )}
 
-
-
-        {/* Certificate Image */}
-        {/* {showCertImage && (
-          <div style={{ textAlign: 'center' }}>
-            <img src="/images/certCompleted.jpg" alt="Certificate" style={{ maxWidth: '100%' }} />
-          </div>
-        )} */}
         <h2>📊 测验结果</h2>
         <p>你的分数: {score} / {questions.length} ({percentage.toFixed(0)}%)</p>
         <p style={{ color: passed ? "green" : "red", fontWeight: "bold", fontSize: "1.5rem" }}>
@@ -584,106 +548,97 @@ const QuizApp = () => {
           setStarted(true);
           loadShuffledQuestions();
         }}>🔁 再挑战</button>
-       
 
         <button className="submit-button" style={{ backgroundColor: '#dc3545' }} onClick={resetQuiz}>⏹ 结束</button>
       </div>
     );
   }
 
-    if (!questions.length || !questions[currentIndex]) {
+  if (!questions.length || !questions[currentIndex]) {
     return <div className="quiz-screen"><p>Loading quiz...</p></div>;
   }
 
   const currentQuestion = questions[currentIndex];
   const isMultiple = Array.isArray(questions[currentIndex].correct);
-
   const selectedAnswers = isMultiple ? (answers[currentIndex] || []) : answers[currentIndex];
 
-
   return (
-  <div
-    className="quiz-screen"
-    style={{
-      // background: `url('${process.env.PUBLIC_URL}/images/quizTime.jpg') no-repeat center center / cover`,
-      background: `url('/images/quizTime.jpg') no-repeat center center / cover`,
-      minHeight: '100vh',
-    }}
-  >
-    <div className="quiz-header">
-      <h2>Question {currentIndex + 1} of {questions.length}</h2>
-      <button onClick={resetQuiz}>❌ 停止</button>
-    </div>
+    <div
+      className="quiz-screen"
+      style={{
+        background: `url('/images/quizTime.jpg') no-repeat center center / cover`,
+        minHeight: '100vh',
+      }}
+    >
+      <div className="quiz-header">
+        <h2>Question {currentIndex + 1} of {questions.length}</h2>
+        <button onClick={resetQuiz}>❌ 停止</button>
+      </div>
 
-    <div className="progress-bar">
-      <div className="progress-fill" style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}></div>
-    </div>
+      <div className="progress-bar">
+        <div className="progress-fill" style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}></div>
+      </div>
 
-    <div className="quiz-question animate">
-      <p><strong style={{ fontSize: '25px' }}>{currentQuestion.question}</strong></p>
+      <div className="quiz-question animate">
+        <p><strong style={{ fontSize: '25px' }}>{currentQuestion.question}</strong></p>
 
-      {isMultiple && (
-        <p style={{ fontStyle: 'italic', color: 'white', marginBottom: '10px', fontSize:'15px' }}>
-          (选择所有适用的选项)
-        </p>
+        {isMultiple && (
+          <p style={{ fontStyle: 'italic', color: 'white', marginBottom: '10px', fontSize: '15px' }}>
+            (选择所有适用的选项)
+          </p>
+        )}
+
+        {currentQuestion.options.map((opt, idx) => {
+          const selected = isMultiple
+            ? selectedAnswers.includes(opt)
+            : selectedAnswers === opt;
+
+          return (
+            <button
+              key={idx}
+              onClick={() => handleSelect(opt)}
+              className={`option-button ${selected ? "selected" : ""}`}
+              style={{ userSelect: "none" }}
+            >
+              {opt}
+            </button>
+          );
+        })}
+      </div>
+
+      {isMultiple && currentIndex < questions.length - 1 && (
+        <button
+          className="submit-button"
+          style={{ marginTop: '15px' }}
+          onClick={() => setCurrentIndex(currentIndex + 1)}
+          disabled={(answers[currentIndex]?.length ?? 0) === 0}
+        >
+          下一页
+        </button>
       )}
 
-      {currentQuestion.options.map((opt, idx) => {
-        const selected = isMultiple
-          ? selectedAnswers.includes(opt)
-          : selectedAnswers === opt;
-
-        return (
-          <button
-            key={idx}
-            onClick={() => handleSelect(opt)}
-            className={`option-button ${selected ? "selected" : ""}`}
-            style={{ userSelect: "none" }}
-          >
-            {opt}
-          </button>
-        );
-      })}
+      {(currentIndex === questions.length - 1) && (
+        <button
+          onClick={handleSubmit}
+          className="submit-button"
+          style={{ marginTop: '15px' }}
+          disabled={
+            isMultiple
+              ? (answers[currentIndex]?.length ?? 0) === 0
+              : !answers[currentIndex]
+          }
+        >
+          提交测验
+        </button>
+      )}
     </div>
-
-    {/* For multiple selection, show Next button except last question */}
-    {isMultiple && currentIndex < questions.length - 1 && (
-      <button
-        className="submit-button"
-        style={{ marginTop: '15px' }}
-        onClick={() => setCurrentIndex(currentIndex + 1)}
-        disabled={(answers[currentIndex]?.length ?? 0) === 0} // disable if no answer
-      >
-        下一页
-      </button>
-    )}
-
-    {/* Show Submit button on last question */}
-    {(currentIndex === questions.length - 1) && (
-      <button
-        onClick={handleSubmit}
-        className="submit-button"
-        style={{ marginTop: '15px' }}
-        disabled={
-          isMultiple
-            ? (answers[currentIndex]?.length ?? 0) === 0
-            : !answers[currentIndex]
-        }
-      >
-        提交测验
-      </button>
-    )}
-  </div>
-);
+  );
 };
-
-
 
 const generateCertificate = async (name, score, total, department) => {
   const bgImageUrl = '/images/certCompleted.jpg';
   const fontUrl = '/SimSun.ttf';
 
-  // Load assets
   const [bgImageBytes, fontBytes] = await Promise.all([
     fetch(bgImageUrl).then((res) => res.arrayBuffer()),
     fetch(fontUrl).then((res) => res.arrayBuffer()),
@@ -698,38 +653,23 @@ const generateCertificate = async (name, score, total, department) => {
 
   const page = pdfDoc.addPage([width, height]);
 
-  // Draw background image
-  page.drawImage(bgImage, {
-    x: 0,
-    y: 0,
-    width,
-    height,
-  });
+  page.drawImage(bgImage, { x: 0, y: 0, width, height });
 
   const centerX = width / 2;
   const date = new Date().toLocaleDateString();
   const percentage = (score / total) * 100;
 
-  // Draw text with shadow effect
   const drawTextWithShadow = (text, x, y, size) => {
     const shadowOffset = 1;
-
-    // Shadow layer
     page.drawText(text, {
       x: x + shadowOffset,
       y: y - shadowOffset,
       size,
       font: customFont,
-      color: rgb(0.6, 0.6, 0.6), // Dark gray
+      color: rgb(0.6, 0.6, 0.6),
     });
-
-    // Main text layer
     page.drawText(text, {
-      x,
-      y,
-      size,
-      font: customFont,
-      color: rgb(0, 0, 0), // Black
+      x, y, size, font: customFont, color: rgb(0, 0, 0),
     });
   };
   const textName = name + `(${department})`;
@@ -740,9 +680,7 @@ const generateCertificate = async (name, score, total, department) => {
   drawTextWithShadow(`Date: ${date}`, centerX - customFont.widthOfTextAtSize(`Date: ${date}`, 18) / 2, height - 420, 18);
   drawTextWithShadow("Bosch Automotive Products (Shenzhen) Co., Ltd.", centerX - customFont.widthOfTextAtSize("Bosch Automotive Products (Shenzhen) Co., Ltd.", 16) / 2, height - 510, 16);
 
-  // Export PDF
   const pdfBytes = await pdfDoc.save();
-
   const blob = new Blob([pdfBytes], { type: "application/pdf" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

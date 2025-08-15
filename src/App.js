@@ -791,6 +791,7 @@
 
 // Updated App.js with routing support
 import React from "react";
+// import { useNavigate } from "react-router-dom";
 import { HashRouter as Router, Route, Routes } from "react-router-dom";
 import QuizApp from "./QuizApp";
 import VoicePage from "./VoicePage";
@@ -811,14 +812,14 @@ function App() {
 function VoicePageWrapper() {
   const empNum = localStorage.getItem("employeeNo") || "";
   const name = localStorage.getItem("name") || "";
-  const ADMIN_NAMES = ["joseph-admin", "queenie-admin"];
+  const ADMIN_NAMES = ["olarinde joseph", "queenie-admin", "li dongqin"];
   const isAdmin = ADMIN_NAMES.includes(name.trim().toLowerCase());
 
   return (
     <VoicePage
       empNum={empNum}
       isAdmin={isAdmin}
-      onBack={() => window.history.back()}
+      // onBack={() => navigate("/")}
     />
   );
 }
