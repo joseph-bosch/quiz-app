@@ -19,6 +19,11 @@ function VoicePage({ empNum, isAdmin, onBack }) {
   const [showQR, setShowQR] = useState({});
   const audioRefs = useRef({});
 
+  // Anti fast-forward state
+  const maxPlayedRef = useRef({});     // { [audioName]: seconds }
+  const ignoreSeekRef = useRef({});    // { [audioName]: boolean }
+  const userSeekingRef = useRef({});   // { [audioName]: boolean }
+
   useEffect(() => {
     fetchAudios();
     fetchListened();
@@ -82,10 +87,7 @@ function VoicePage({ empNum, isAdmin, onBack }) {
   };
 
   const fetchListened = async () => {
-    if (!empNum) {
-      // No DB records to fetch; leave listened empty so UI will rely on live session state.
-      return;
-    }
+    if (!empNum) return;
     const { data, error } = await supabase
       .from("audio_progress")
       .select("audio_name, duration, completed")
@@ -155,7 +157,7 @@ function VoicePage({ empNum, isAdmin, onBack }) {
     }
   };
 
-  // Option B: Commit progress using playback time; no event add/remove.
+  // Persist progress using playback time; no manual add/remove listeners
   const commitProgress = async (audio, el, forceComplete = false) => {
     if (!el) return;
 
@@ -165,7 +167,7 @@ function VoicePage({ empNum, isAdmin, onBack }) {
     const isCompleted =
       forceComplete || (total ? current / total >= 0.95 : false);
 
-    // Update UI immediately (even if empNum missing)
+    // Update UI immediately
     setListened((prev) => ({
       ...prev,
       [audio.name]: {
@@ -175,44 +177,38 @@ function VoicePage({ empNum, isAdmin, onBack }) {
       },
     }));
 
-    // Only write to DB when we have a valid empNum
     if (!empNum) return;
 
-    const { data: existing, error:findErr } = await supabase
+    const { data: existing, error: findErr } = await supabase
       .from("audio_progress")
       .select("id")
       .eq("emp_num", empNum)
       .eq("audio_name", audio.name)
       .maybeSingle();
 
-      if (findErr) {
-        console.error("find error", findErr);
-        return;
+    if (findErr) {
+      console.error("find error", findErr);
+      return;
     }
 
     if (existing) {
-      const { data: updated, error: updErr } = await supabase
+      const { error: updErr } = await supabase
         .from("audio_progress")
         .update({ duration: listenedSeconds, completed: isCompleted })
-        .eq("id", existing.id) // ✅ update by id (exact row)
-        .select(); // ✅ returns updated row(s)
-
-        if (updErr) console.error("update error", updErr);
-        else console.log("updated", updated);
-    } 
-    else {
-      const { data: inserted, error: insErr } = await supabase
+        .eq("id", existing.id)
+        .select("*");
+      if (updErr) console.error("update error", updErr);
+    } else {
+      const { error: insErr } = await supabase
         .from("audio_progress")
         .insert({
-        emp_num: empNum,
-        audio_name: audio.name,
-        duration: listenedSeconds,
-        completed: isCompleted,
+          emp_num: empNum,
+          audio_name: audio.name,
+          duration: listenedSeconds,
+          completed: isCompleted,
         })
-        .select(); // ✅ returns inserted row
-
-        if (insErr) console.error("insert error", insErr);
-        else console.log("inserted", inserted);
+        .select("*");
+      if (insErr) console.error("insert error", insErr);
     }
   };
 
@@ -239,6 +235,75 @@ function VoicePage({ empNum, isAdmin, onBack }) {
       [audio.name]: !prev[audio.name],
     }));
   };
+
+  // ---------- Anti fast-forward handlers ----------
+  const tolerance = 1.0; // seconds; higher to avoid stutter on normal playback
+
+  const clampToMax = (name, el) => {
+    const max = maxPlayedRef.current[name] || 0;
+    if (el.currentTime > max + tolerance && !ignoreSeekRef.current[name]) {
+      ignoreSeekRef.current[name] = true;
+      el.currentTime = max;
+      // release guard next tick
+      setTimeout(() => {
+        ignoreSeekRef.current[name] = false;
+      }, 0);
+      return true; // clamped
+    }
+    return false;
+  };
+
+  // Time updates during normal playback should NOT clamp
+  const handleTimeUpdateGuarded = (audio, el) => {
+    const name = audio.name;
+
+    // Only enforce while the element is seeking (user dragging/clicking)
+    if (el.seeking || userSeekingRef.current[name]) {
+      if (clampToMax(name, el)) {
+        updateProgress(name, el.currentTime, el.duration);
+        return;
+      }
+    }
+
+    // Normal progression: update and grow max
+    updateProgress(name, el.currentTime, el.duration);
+    const current = el.currentTime || 0;
+    const prevMax = maxPlayedRef.current[name] || 0;
+    if (current > prevMax) {
+      maxPlayedRef.current[name] = current;
+    }
+  };
+
+  const handleSeeking = (audio, el) => {
+    const name = audio.name;
+    userSeekingRef.current[name] = true;
+    clampToMax(name, el);
+  };
+
+  const handleSeeked = (audio, el) => {
+    const name = audio.name;
+    clampToMax(name, el);
+    // done with seeking
+    userSeekingRef.current[name] = false;
+  };
+
+  const handleLoadedMetadata = (audio, el) => {
+    // Initialize "max played" from saved progress if any
+    const saved = listened[audio.name]?.duration || 0;
+    maxPlayedRef.current[audio.name] = saved;
+
+    // Optional: resume where left off
+    if (saved > 0 && saved < (el.duration || 0)) {
+      el.currentTime = saved;
+    }
+  };
+
+  const handleRateChange = (e) => {
+    if (e.target.playbackRate !== 1) {
+      e.target.playbackRate = 1;
+    }
+  };
+  // ------------------------------------------------
 
   return (
     <div className="voice-page">
@@ -296,7 +361,6 @@ function VoicePage({ empNum, isAdmin, onBack }) {
             {audios.map((audio) => {
               const listenedEntry = listened[audio.name];
               const listenedClass = listenedEntry?.completed ? "listened" : "";
-              const p = progress[audio.name] || {};
               const cleanName = audio.name.replace(/\.[^/.]+$/, "");
               const qrUrl = `${window.location.origin}/#/audioPage/${cleanName}`;
 
@@ -309,27 +373,23 @@ function VoicePage({ empNum, isAdmin, onBack }) {
 
                   <audio
                     controls
+                    controlsList="nodownload noplaybackrate noremoteplayback"
+                    disablePictureInPicture
                     ref={(el) => (audioRefs.current[audio.name] = el)}
-                    onTimeUpdate={(e) =>
-                      updateProgress(
-                        audio.name,
-                        e.target.currentTime,
-                        e.target.duration
-                      )
+                    onLoadedMetadata={(e) =>
+                      handleLoadedMetadata(audio, e.target)
                     }
+                    onTimeUpdate={(e) =>
+                      handleTimeUpdateGuarded(audio, e.target)
+                    }
+                    onSeeking={(e) => handleSeeking(audio, e.target)}
+                    onSeeked={(e) => handleSeeked(audio, e.target)}
+                    onRateChange={handleRateChange}
                     onPause={(e) => commitProgress(audio, e.target)}
                     onEnded={(e) => commitProgress(audio, e.target, true)}
                   >
-                    {/* omit type to avoid mismatches across mp3/mp4/ogg */}
                     <source src={audio.url} />
                   </audio>
-
-                  <div className="progress-bar-container">
-                    <div
-                      className="progress-bar"
-                      style={{ width: `${p.percent || 0}%` }}
-                    />
-                  </div>
 
                   {listenedEntry?.completed && <div>✅ 完成了</div>}
                   {!listenedEntry?.completed &&
