@@ -90,6 +90,7 @@ const QuizApp = () => {
       supabase
         .from("scores")
         .select("*")
+        .range(0, 3000)
         .order("timestamp", { ascending: false })
         .then(({ data, error }) => {
           if (error) console.error("History fetch error:", error.message);
