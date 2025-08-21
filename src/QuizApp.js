@@ -87,17 +87,40 @@ const QuizApp = () => {
 
   useEffect(() => {
     if (showHistory) {
-      supabase
-        .from("scores")
-        .select("*")
-        .range(0, 3000)
-        .order("timestamp", { ascending: false })
-        .then(({ data, error }) => {
-          if (error) console.error("History fetch error:", error.message);
-          else setAllHistory(data);
-        });
+      fetchAllHistory();
     }
   }, [showHistory]);
+
+  const fetchAllHistory = async () => {
+    let allData = [];
+    let from = 0;
+    const batchSize = 1000;
+    let moreData = true;
+
+    while (moreData) {
+      const { data, error } = await supabase
+        .from("scores")
+        .select("*")
+        .order("timestamp", { ascending: false })
+        .range(from, from + batchSize - 1);
+
+      if (error) {
+        console.error("History fetch error:", error.message);
+        break;
+      }
+
+      if (data && data.length > 0) {
+        allData = [...allData, ...data];
+        from += batchSize;
+      } else {
+        moreData = false; // no more rows
+      }
+    }
+
+    setAllHistory(allData);
+    console.log("✅ Total rows fetched:", allData.length);
+  };
+
 
   const handleSelect = (option) => {
     const currentQuestion = questions[currentIndex];
