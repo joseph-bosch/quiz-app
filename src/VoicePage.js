@@ -434,14 +434,14 @@
 
 // https://youtu.be/RSN_We4Myx8
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "./supabaseClient";
 import { QRCodeCanvas } from "qrcode.react";
 import "./VoicePage.css";
 
 function VoicePage({ empNum, isAdmin, onBack }) {
-  const { audioName } = useParams(); // reuse param for videoName
+  const { audioName } = useParams();
   const navigate = useNavigate();
 
   const [videos, setVideos] = useState([]);
@@ -451,41 +451,40 @@ function VoicePage({ empNum, isAdmin, onBack }) {
   const [newVideoName, setNewVideoName] = useState("");
   const [newVideoUrl, setNewVideoUrl] = useState("");
   const [uploading, setUploading] = useState(false);
-  const ytPlayersRef = useRef({}); // store all YouTube players
 
-  // Load YouTube API
-  useEffect(() => {
-    if (!window.YT) {
-      const tag = document.createElement("script");
-      tag.src = "https://www.youtube.com/iframe_api";
-      document.body.appendChild(tag);
-    }
-  }, []);
-
-  // Normalize YouTube URL to embed
+  // Detect and normalize URLs (YouTube / PeerTube)
   const getEmbedUrl = (url) => {
     try {
       const urlObj = new URL(url);
-      let videoId = "";
 
-      if (urlObj.hostname.includes("youtube.com")) {
-        if (urlObj.pathname.startsWith("/shorts/")) {
-          videoId = urlObj.pathname.split("/")[2]; // /shorts/VIDEO_ID
-        } else {
-          videoId = urlObj.searchParams.get("v");
+      // 🎥 YouTube handling
+      if (urlObj.hostname.includes("youtube.com") || urlObj.hostname.includes("youtu.be")) {
+        let videoId = "";
+        if (urlObj.hostname.includes("youtube.com")) {
+          if (urlObj.pathname.startsWith("/shorts/")) {
+            videoId = urlObj.pathname.split("/")[2];
+          } else {
+            videoId = urlObj.searchParams.get("v");
+          }
+        } else if (urlObj.hostname.includes("youtu.be")) {
+          videoId = urlObj.pathname.slice(1);
         }
-      } else if (urlObj.hostname.includes("youtu.be")) {
-        videoId = urlObj.pathname.slice(1);
+        if (!videoId) return "";
+        return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&rel=0&modestbranding=1`;
       }
 
-      if (!videoId) return ""; // invalid URL
-      return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&enablejsapi=1&rel=0&modestbranding=1`;
+      // 🎥 PeerTube handling (already an embed link)
+      if (urlObj.pathname.includes("/videos/embed/")) {
+        return url; // direct use
+      }
+
+      return ""; // unsupported
     } catch {
-      return ""; // invalid URL
+      return "";
     }
   };
 
-
+  // Fetch videos from Supabase
   const fetchVideos = async () => {
     const { data, error } = await supabase
       .from("videos")
@@ -508,9 +507,10 @@ function VoicePage({ empNum, isAdmin, onBack }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Add new video
   const handleAddVideo = async () => {
     if (!newVideoName.trim() || !newVideoUrl.trim()) {
-      alert("Please fill in both name and YouTube URL.");
+      alert("Please fill in both name and video URL.");
       return;
     }
     setUploading(true);
@@ -528,57 +528,23 @@ function VoicePage({ empNum, isAdmin, onBack }) {
     setUploading(false);
   };
 
+  // Delete video
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this video?")) return;
     const { error } = await supabase.from("videos").delete().eq("id", id);
     if (!error) fetchVideos();
   };
 
+  // Back button
   const handleBack = () => {
     if (onBack) return onBack();
     navigate(audioName ? "/audioPage" : "/");
   };
 
+  // Toggle QR
   const toggleQR = (video) => {
     setShowQR((prev) => ({ ...prev, [video.id]: !prev[video.id] }));
   };
-
-  const handleUnmute = (videoId) => {
-    const player = ytPlayersRef.current[videoId];
-    if (player && typeof player.unMute === "function") {
-      player.unMute();
-      player.setVolume(100);
-    }
-  };
-
-  // Initialize YouTube players after videos render
-  useEffect(() => {
-    if (!window.YT || videos.length === 0) return;
-
-    videos.forEach((video) => {
-      const iframe = document.getElementById(`yt-${video.id}`);
-      if (!iframe || ytPlayersRef.current[video.id]) return;
-
-      const player = new window.YT.Player(`yt-${video.id}`, {
-        events: {
-          onReady: (event) => {
-            event.target.mute();
-            event.target.playVideo();
-          },
-          onStateChange: (event) => {
-            if (event.data === window.YT.PlayerState.PLAYING) {
-              Object.values(ytPlayersRef.current).forEach((p) => {
-                if (p !== event.target) p.pauseVideo();
-              });
-            }
-          },
-        },
-      });
-
-      ytPlayersRef.current[video.id] = player;
-    });
-  }, [videos]);
-
 
   return (
     <div className="voice-page">
@@ -610,8 +576,7 @@ function VoicePage({ empNum, isAdmin, onBack }) {
                   <div className="video-container">
                     {video.embedUrl ? (
                       <iframe
-                        id={`yt-${video.id}`}
-                        src={video.embedUrl}
+                        src={`${video.embedUrl}?autoplay=1&muted=1`}
                         width="560"
                         height="315"
                         title={video.name}
@@ -621,24 +586,9 @@ function VoicePage({ empNum, isAdmin, onBack }) {
                       />
                     ) : (
                       <div style={{ color: "red" }}>
-                        ❌ Invalid YouTube URL: {video.youtube_url}
+                        ❌ Invalid video URL: {video.youtube_url}
                       </div>
                     )}
-
-                    <div
-                      className="video-overlay"
-                      onClick={() => handleUnmute(video.id)}
-                      style={{
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        width: "100%",
-                        height: "100%",
-                        cursor: "pointer",
-                      }}
-                    >
-                      🔊 点击解锁声音
-                    </div>
                   </div>
 
                   {isAdmin && (
@@ -668,7 +618,6 @@ function VoicePage({ empNum, isAdmin, onBack }) {
               );
             })}
           </div>
-
         </>
       )}
 
@@ -685,7 +634,7 @@ function VoicePage({ empNum, isAdmin, onBack }) {
             />
             <input
               type="text"
-              placeholder="YouTube 链接"
+              placeholder="YouTube 或 PeerTube 链接"
               value={newVideoUrl}
               onChange={(e) => setNewVideoUrl(e.target.value)}
             />
