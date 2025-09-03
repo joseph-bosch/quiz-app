@@ -812,7 +812,7 @@ function App() {
 function VoicePageWrapper() {
   const empNum = localStorage.getItem("employeeNo") || "";
   const name = localStorage.getItem("name") || "";
-  const ADMIN_NAMES = ["olarinde joseph", "queenie-admin", "li dongqin"];
+  const ADMIN_NAMES = ["olarinde joseph", "li dongqin"];
   const isAdmin = ADMIN_NAMES.includes(name.trim().toLowerCase());
 
   return (
