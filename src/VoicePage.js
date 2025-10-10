@@ -19,10 +19,35 @@ function VoicePage({ empNum, isAdmin, onBack }) {
   const [showQR, setShowQR] = useState({});
   const audioRefs = useRef({});
 
+  // ✅ User info modal states
+  const [employeeNo, setEmployeeNo] = useState(
+    localStorage.getItem("employeeNo") || ""
+  );
+  const [department, setDepartment] = useState(
+    localStorage.getItem("department") || ""
+  );
+  const [name, setName] = useState(localStorage.getItem("name") || "");
+  const [employeeError, setEmployeeError] = useState("");
+  const [showModal, setShowModal] = useState(!localStorage.getItem("employeeNo"));
+
+  const effectiveEmpNum = empNum || employeeNo;
+
+  const departments = [
+    "BD/SLP-CO2", "C/TXR-CN-D4", "GR/FCM-Shz", "GS/OBR23-APAC17", "GS/OSD4-APAC16",
+    "GS/PSD5-AP", "MA/HRL-Shz", "MA-WS/PAS-EAA-CN", "MA-WS/PAW-ENG1-CN", "MA-WS/PAW-ENG2-CN",
+    "MA-WS/PAW-ENG3-CN", "MA-WS/PAW-ENG-CN", "MA-WS/PUQ1-Shz", "MA-WS/PUQ2-Shz", "MA-WS/PUQ-Shz",
+    "MA-WS/PUR2", "ShzP/COR", "ShzP/CTG", "ShzP/HSE", "ShzP/LOG", "ShzP/LOP", "ShzP/LOW", "ShzP/LOW1",
+    "ShzP/LOW2", "ShzP/MFE", "ShzP/MFI", "ShzP/MFO1", "ShzP/MFO11", "ShzP/MFO12", "ShzP/MFO13",
+    "ShzP/MFO2", "ShzP/MFO21", "ShzP/MFO22", "ShzP/MFO23", "ShzP/MFO24", "ShzP/MFO3", "ShzP/MFO31",
+    "ShzP/MFO32", "ShzP/MFO33", "ShzP/MFO4", "ShzP/MFO5", "ShzP/MFO51", "ShzP/MFO52", "ShzP/MFO53",
+    "ShzP/MOE", "ShzP/PM", "ShzP/QMM", "ShzP/QMM1", "ShzP/QMM2", "ShzP/QMM6", "ShzP/TEF", "ShzP/TEF1",
+    "ShzP/TEF2"
+  ];
+
   // Anti fast-forward state
-  const maxPlayedRef = useRef({});     // { [audioName]: seconds }
-  const ignoreSeekRef = useRef({});    // { [audioName]: boolean }
-  const userSeekingRef = useRef({});   // { [audioName]: boolean }
+  const maxPlayedRef = useRef({});
+  const ignoreSeekRef = useRef({});
+  const userSeekingRef = useRef({});
 
   useEffect(() => {
     fetchAudios();
@@ -87,11 +112,11 @@ function VoicePage({ empNum, isAdmin, onBack }) {
   };
 
   const fetchListened = async () => {
-    if (!empNum) return;
+    if (!effectiveEmpNum) return;
     const { data, error } = await supabase
       .from("audio_progress")
       .select("audio_name, duration, completed")
-      .eq("emp_num", empNum);
+      .eq("emp_num", effectiveEmpNum);
 
     if (!error && data) {
       const map = {};
@@ -100,6 +125,14 @@ function VoicePage({ empNum, isAdmin, onBack }) {
       });
       setListened(map);
     }
+  };
+
+  const handleSaveUserInfo = () => {
+    if (!department.trim() || !name.trim() || employeeNo.length < 8) return;
+    localStorage.setItem("employeeNo", employeeNo);
+    localStorage.setItem("department", department);
+    localStorage.setItem("name", name);
+    setShowModal(false);
   };
 
   const handleUpload = async () => {
@@ -157,7 +190,6 @@ function VoicePage({ empNum, isAdmin, onBack }) {
     }
   };
 
-  // Persist progress using playback time; no manual add/remove listeners
   const commitProgress = async (audio, el, forceComplete = false) => {
     if (!el) return;
 
@@ -167,7 +199,6 @@ function VoicePage({ empNum, isAdmin, onBack }) {
     const isCompleted =
       forceComplete || (total ? current / total >= 0.95 : false);
 
-    // Update UI immediately
     setListened((prev) => ({
       ...prev,
       [audio.name]: {
@@ -177,38 +208,29 @@ function VoicePage({ empNum, isAdmin, onBack }) {
       },
     }));
 
-    if (!empNum) return;
+    if (!effectiveEmpNum) return;
 
     const { data: existing, error: findErr } = await supabase
       .from("audio_progress")
       .select("id")
-      .eq("emp_num", empNum)
+      .eq("emp_num", effectiveEmpNum)
       .eq("audio_name", audio.name)
       .maybeSingle();
 
-    if (findErr) {
-      console.error("find error", findErr);
-      return;
-    }
+    if (findErr) return;
 
     if (existing) {
-      const { error: updErr } = await supabase
+      await supabase
         .from("audio_progress")
         .update({ duration: listenedSeconds, completed: isCompleted })
-        .eq("id", existing.id)
-        .select("*");
-      if (updErr) console.error("update error", updErr);
+        .eq("id", existing.id);
     } else {
-      const { error: insErr } = await supabase
-        .from("audio_progress")
-        .insert({
-          emp_num: empNum,
-          audio_name: audio.name,
-          duration: listenedSeconds,
-          completed: isCompleted,
-        })
-        .select("*");
-      if (insErr) console.error("insert error", insErr);
+      await supabase.from("audio_progress").insert({
+        emp_num: effectiveEmpNum,
+        audio_name: audio.name,
+        duration: listenedSeconds,
+        completed: isCompleted,
+      });
     }
   };
 
@@ -236,36 +258,28 @@ function VoicePage({ empNum, isAdmin, onBack }) {
     }));
   };
 
-  // ---------- Anti fast-forward handlers ----------
-  const tolerance = 1.0; // seconds; higher to avoid stutter on normal playback
-
+  const tolerance = 1.0;
   const clampToMax = (name, el) => {
     const max = maxPlayedRef.current[name] || 0;
     if (el.currentTime > max + tolerance && !ignoreSeekRef.current[name]) {
       ignoreSeekRef.current[name] = true;
       el.currentTime = max;
-      // release guard next tick
       setTimeout(() => {
         ignoreSeekRef.current[name] = false;
       }, 0);
-      return true; // clamped
+      return true;
     }
     return false;
   };
 
-  // Time updates during normal playback should NOT clamp
   const handleTimeUpdateGuarded = (audio, el) => {
     const name = audio.name;
-
-    // Only enforce while the element is seeking (user dragging/clicking)
     if (el.seeking || userSeekingRef.current[name]) {
       if (clampToMax(name, el)) {
         updateProgress(name, el.currentTime, el.duration);
         return;
       }
     }
-
-    // Normal progression: update and grow max
     updateProgress(name, el.currentTime, el.duration);
     const current = el.currentTime || 0;
     const prevMax = maxPlayedRef.current[name] || 0;
@@ -283,16 +297,12 @@ function VoicePage({ empNum, isAdmin, onBack }) {
   const handleSeeked = (audio, el) => {
     const name = audio.name;
     clampToMax(name, el);
-    // done with seeking
     userSeekingRef.current[name] = false;
   };
 
   const handleLoadedMetadata = (audio, el) => {
-    // Initialize "max played" from saved progress if any
     const saved = listened[audio.name]?.duration || 0;
     maxPlayedRef.current[audio.name] = saved;
-
-    // Optional: resume where left off
     if (saved > 0 && saved < (el.duration || 0)) {
       el.currentTime = saved;
     }
@@ -303,10 +313,79 @@ function VoicePage({ empNum, isAdmin, onBack }) {
       e.target.playbackRate = 1;
     }
   };
-  // ------------------------------------------------
 
   return (
     <div className="voice-page">
+      {showModal && (
+        <div className="modal-overlay-audio">
+          <div className="modal-content-audio">
+            <h2>🎓 请输入您的信息</h2>
+
+            <input
+              type="text"
+              value={employeeNo}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (/^\d*$/.test(value)) {
+                  setEmployeeNo(value);
+                  if (value.length < 8) {
+                    setEmployeeError("工号必须至少8位数字");
+                  } else {
+                    setEmployeeError("");
+                  }
+                }
+              }}
+              placeholder="工号"
+            />
+            {employeeError && <p style={{ color: "red" }}>{employeeError}</p>}
+
+            <select
+              value={department}
+              onChange={(e) => setDepartment(e.target.value)}
+              style={{ width: "250px", padding: "8px", marginTop: "10px" }}
+            >
+              <option value="">选择部门</option>
+              {departments.map((dept) => (
+                <option key={dept} value={dept}>
+                  {dept}
+                </option>
+              ))}
+            </select>
+
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="姓名"
+              style={{ marginTop: "10px" }}
+            />
+
+            <button
+              onClick={handleSaveUserInfo}
+              disabled={
+                !department.trim() || !name.trim() || employeeNo.length < 8
+              }
+              style={{
+                backgroundColor:
+                  !department.trim() || !name.trim() || employeeNo.length < 8
+                    ? "#ccc"
+                    : "#4CAF50",
+                color: "white",
+                padding: "8px 16px",
+                border: "none",
+                cursor:
+                  !department.trim() || !name.trim() || employeeNo.length < 8
+                    ? "not-allowed"
+                    : "pointer",
+                marginTop: "10px",
+              }}
+            >
+              🎧 听语音
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="voice-header">
         <h2>🎧 收听音频</h2>
         <button onClick={handleBack}>🔙 返回</button>
@@ -431,6 +510,7 @@ function VoicePage({ empNum, isAdmin, onBack }) {
 }
 
 export default VoicePage;
+
 
 // https://youtu.be/RSN_We4Myx8
 

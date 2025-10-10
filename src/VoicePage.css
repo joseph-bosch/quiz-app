@@ -64,6 +64,27 @@
   width: 100%;
 }
 
+.modal-overlay-audio {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+}
+.modal-content-audio {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  width: 320px;
+  text-align: center;
+}
+
+
 /* .audio-item .delete-button {
   margin-top: auto;
   padding: 6px 10px;
