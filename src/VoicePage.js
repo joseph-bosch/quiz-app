@@ -1,6 +1,7 @@
 // VoicePage.js
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import Select from "react-select";
 import { supabase } from "./supabaseClient";
 import { QRCodeCanvas } from "qrcode.react";
 import "./VoicePage.css";
@@ -17,6 +18,7 @@ function VoicePage({ empNum, isAdmin, onBack }) {
   const [uploadStatus, setUploadStatus] = useState("");
   const [notFound, setNotFound] = useState(false);
   const [showQR, setShowQR] = useState({});
+  const [userPaused, setUserPaused] = useState(false);
   const audioRefs = useRef({});
 
   // ✅ User info modal states
@@ -42,7 +44,7 @@ function VoicePage({ empNum, isAdmin, onBack }) {
     "ShzP/MFO32", "ShzP/MFO33", "ShzP/MFO4", "ShzP/MFO5", "ShzP/MFO51", "ShzP/MFO52", "ShzP/MFO53",
     "ShzP/MOE", "ShzP/PM", "ShzP/QMM", "ShzP/QMM1", "ShzP/QMM2", "ShzP/QMM6", "ShzP/TEF", "ShzP/TEF1",
     "ShzP/TEF2"
-  ];
+  ].map((dept) => ({ value: dept, label: dept }));
 
   // Anti fast-forward state
   const maxPlayedRef = useRef({});
@@ -56,34 +58,47 @@ function VoicePage({ empNum, isAdmin, onBack }) {
   }, []);
 
   useEffect(() => {
+    if (showModal) return; // ❌ Do nothing while modal is visible
+
     const tryAutoPlay = () => {
       if (!audioName || audios.length === 0) return;
       const matchingAudio = audios.find(
         (a) => a.name.replace(/\.[^/.]+$/, "") === audioName
       );
-      const isCompleted =
-        matchingAudio && listened[matchingAudio.name]?.completed;
-      const audioEl = matchingAudio && audioRefs.current[matchingAudio.name];
+      if (!matchingAudio) return;
 
-      if (matchingAudio && audioEl && !isCompleted) {
-        audioEl.play().catch(() => {
-          const resumeOnInteraction = () => {
-            audioEl
-              .play()
-              .finally(() => {
-                window.removeEventListener("click", resumeOnInteraction);
-                window.removeEventListener("keydown", resumeOnInteraction);
-              })
-              .catch(() => {});
-          };
-          window.addEventListener("click", resumeOnInteraction);
-          window.addEventListener("keydown", resumeOnInteraction);
-        });
-      }
+      const audioEl = audioRefs.current[matchingAudio.name];
+      const isCompleted = listened[matchingAudio.name]?.completed;
+
+      if (!audioEl || isCompleted) return;
+
+      const attemptPlay = () => {
+        if (!userPaused) {
+          audioEl.play().catch(() => {
+            const resumeOnInteraction = () => {
+              if (!userPaused) {        // 🚨 only resume if user didn’t manually pause
+                audioEl.play()
+                  .finally(() => {
+                    window.removeEventListener("click", resumeOnInteraction);
+                    window.removeEventListener("keydown", resumeOnInteraction);
+                  })
+                  .catch(() => {});
+              }
+            };
+            window.addEventListener("click", resumeOnInteraction);
+            window.addEventListener("keydown", resumeOnInteraction);
+          });
+        }
+
+      };
+
+      // Slight delay to ensure modal fade-out completed
+      setTimeout(attemptPlay, 300);
     };
 
     tryAutoPlay();
-  }, [audios, audioName, listened]);
+  }, [showModal, audios, audioName, listened]);
+
 
   const fetchAudios = async () => {
     const { data, error } = await supabase.storage
@@ -230,6 +245,8 @@ function VoicePage({ empNum, isAdmin, onBack }) {
         audio_name: audio.name,
         duration: listenedSeconds,
         completed: isCompleted,
+        department: department,
+        user_name: name,
       });
     }
   };
@@ -318,7 +335,7 @@ function VoicePage({ empNum, isAdmin, onBack }) {
     <div className="voice-page">
       {showModal && (
         <div className="modal-overlay-audio">
-          <div className="modal-content-audio">
+          <div className="modal-content-audio start-content-audio" >
             <h2>🎓 请输入您的信息</h2>
 
             <input
@@ -329,35 +346,52 @@ function VoicePage({ empNum, isAdmin, onBack }) {
                 if (/^\d*$/.test(value)) {
                   setEmployeeNo(value);
                   if (value.length < 8) {
-                    setEmployeeError("工号必须至少8位数字");
+                    setEmployeeError("请输入正确的工号");
                   } else {
                     setEmployeeError("");
                   }
                 }
               }}
               placeholder="工号"
+              style={{ width: "250px" }}
             />
-            {employeeError && <p style={{ color: "red" }}>{employeeError}</p>}
+            {employeeError && <p style={{ color: "red", marginTop: "0px" }}>{employeeError}</p>}
 
-            <select
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-              style={{ width: "250px", padding: "8px", marginTop: "10px" }}
-            >
-              <option value="">选择部门</option>
-              {departments.map((dept) => (
-                <option key={dept} value={dept}>
-                  {dept}
-                </option>
-              ))}
-            </select>
+            <Select
+              options={departments}
+              value={departments.find((d) => d.value === department)}
+              placeholder="选择部门"
+              onChange={(selected) => setDepartment(selected ? selected.value : "")}
+              styles={{
+                container: (base) => ({
+                  ...base,
+                  width: "275px",
+                  borderRadius: "12px",
+                  color: "black",
+                  margin: "0 auto",
+                }),
+                control: (base) => ({
+                  ...base,
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  textAlign: "left",
+                  minHeight: "40px",
+                  paddingLeft: "5px",
+                }),
+                placeholder: (base) => ({
+                  ...base,
+                  textAlign: "left",
+                  marginLeft: 0,
+                }),
+              }}
+            />
 
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="姓名"
-              style={{ marginTop: "10px" }}
+              style={{ width: "250px" }}
             />
 
             <button
@@ -464,7 +498,8 @@ function VoicePage({ empNum, isAdmin, onBack }) {
                     onSeeking={(e) => handleSeeking(audio, e.target)}
                     onSeeked={(e) => handleSeeked(audio, e.target)}
                     onRateChange={handleRateChange}
-                    onPause={(e) => commitProgress(audio, e.target)}
+                    onPause={(e) => {setUserPaused(true); e.target.pause(); commitProgress(audio, e.target)}}
+                    onPlay={() => setUserPaused(false)}
                     onEnded={(e) => commitProgress(audio, e.target, true)}
                   >
                     <source src={audio.url} />

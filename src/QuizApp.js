@@ -35,6 +35,8 @@ const QuizApp = () => {
   const [loading, setLoading] = useState(false);
   const [insertError, setInsertError] = useState(null);
   const [showCertImage, setShowCertImage] = useState(false);
+  const [showAudioHistory, setShowAudioHistory] = useState(false);
+  const [audioProgress, setAudioProgress] = useState([]);
 
   const departments = [
     "BD/SLP-CO2", "C/TXR-CN-D4", "GR/FCM-Shz", "GS/OBR23-APAC17", "GS/OSD4-APAC16",
@@ -88,6 +90,7 @@ const QuizApp = () => {
   useEffect(() => {
     if (showHistory) {
       fetchAllHistory();
+      fetchAudioProgress();
     }
   }, [showHistory]);
 
@@ -121,6 +124,36 @@ const QuizApp = () => {
     console.log("✅ Total rows fetched:", allData.length);
   };
 
+  const fetchAudioProgress = async () => {
+    let allAudio = [];
+    let from = 0;
+    const batchSize = 1000;
+    let moreData = true;
+
+    while (moreData) {
+      const { data, error } = await supabase
+        .from("audio_progress")
+        .select("*")
+        .order("listened_at", { ascending: false })
+        .range(from, from + batchSize - 1);
+
+      if (error) {
+        console.error("Audio progress fetch error:", error.message);
+        break;
+      }
+
+      if (data && data.length > 0) {
+        allAudio = [...allAudio, ...data];
+        from += batchSize;
+      } else {
+        moreData = false;
+      }
+    }
+
+    setAudioProgress(allAudio);
+    console.log("✅ Total audio rows fetched:", allAudio.length);
+  };
+
 
   const handleSelect = (option) => {
     const currentQuestion = questions[currentIndex];
@@ -146,18 +179,47 @@ const QuizApp = () => {
   };
 
   const exportToExcel = () => {
-    const worksheet = XLSX.utils.json_to_sheet(allHistory.map(row => ({
-      Name: row.name,
-      "Employee No": row.emp_num || '',
-      Score: row.score,
-      Total: row.total,
-      Result: row.pass ? "Pass" : "Fail",
-      Time: new Date(row.timestamp).toLocaleString(),
-    })));
+    // Determine which table to export
+    const dataToExport = showAudioHistory ? audioProgress : allHistory;
+
+    // Map data according to the table type
+    const mappedData = dataToExport.map(row => {
+      if (showAudioHistory) {
+        return {
+          "Employee No": row.emp_num || '',
+          "Name": row.user_name || '',
+          "Department": row.department,
+          "Audio Name": row.audio_name,
+          Completed: row.completed ? "Yes" : "No",
+          Progress:  row.duration < 60 
+                        ? `${row.duration} secs` 
+                        : `${(row.duration / 60).toFixed(1)} mins`,
+          "Last Updated": new Date(row.listened_at).toLocaleString(),
+        };
+      } else {
+        return {
+          Name: row.name,
+          "Employee No": row.emp_num || '',
+          "Department": row.department,
+          Score: row.score,
+          Total: row.total,
+          Result: row.pass ? "Pass" : "Fail",
+          Time: new Date(row.timestamp).toLocaleString(),
+        };
+      }
+    });
+
+    // Create worksheet & workbook
+    const worksheet = XLSX.utils.json_to_sheet(mappedData);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "QuizHistory");
-    XLSX.writeFile(workbook, "Quiz_History.xlsx");
+    const sheetName = showAudioHistory ? "AudioHistory" : "QuizHistory";
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+
+    // Save the file
+    const fileName = showAudioHistory ? "Audio_History.xlsx" : "Quiz_History.xlsx";
+    XLSX.writeFile(workbook, fileName);
   };
+
 
   const isAnswerCorrect = (question, selected) => {
     if (Array.isArray(question.correct)) {
@@ -207,15 +269,19 @@ const QuizApp = () => {
     if (!error && data) setHistoryData(data);
   };
 
-  // ❌ removed inline VoicePage rendering
-  // if (showVoicePage) {
-  //   return <VoicePage empNum={employeeNo} isAdmin={isAdmin} onBack={() => setShowVoicePage(false)} />;
-  // }
 
   if (showHistory) {
-    const totalPages = Math.ceil(allHistory.length / ITEMS_PER_PAGE);
-    const startIndex = (historyPage - 1) * ITEMS_PER_PAGE;
-    const pagedHistory = allHistory.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    
+
+    // Pagination for quiz history
+    const totalPagesHistory = Math.ceil(allHistory.length / ITEMS_PER_PAGE);
+    const startIndexHistory = (historyPage - 1) * ITEMS_PER_PAGE;
+    const pagedHistory = allHistory.slice(startIndexHistory, startIndexHistory + ITEMS_PER_PAGE);
+
+    // Pagination for audio history
+    const totalPagesAudio = Math.ceil(audioProgress.length / ITEMS_PER_PAGE);
+    const startIndexAudio = (historyPage - 1) * ITEMS_PER_PAGE;
+    const pagedAudio = audioProgress.slice(startIndexAudio, startIndexAudio + ITEMS_PER_PAGE);
 
     return (
       <div style={{
@@ -228,7 +294,7 @@ const QuizApp = () => {
         fontFamily: "Segoe UI, sans-serif"
       }}>
         <h2 style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          📜 All User Quiz History
+          {showAudioHistory ? "🎧 Audio History" : "📜 All User Quiz History"}
         </h2>
 
         <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
@@ -244,6 +310,7 @@ const QuizApp = () => {
           >
             🔙 Back to Start
           </button>
+
           <button
             onClick={exportToExcel}
             style={{
@@ -257,41 +324,98 @@ const QuizApp = () => {
           >
             📤 Export Results
           </button>
+
+          <button
+            onClick={() => {
+              setShowAudioHistory((prev) => !prev);
+              setHistoryPage(1); // reset page when switching tables
+            }}
+            style={{
+              padding: "0.5rem 1rem",
+              backgroundColor: "#80bbcbff",
+              color: "#fff",
+              border: "none",
+              borderRadius: "5px",
+              cursor: "pointer",
+              marginLeft: "auto",
+            }}
+          >
+            📝 {showAudioHistory ? "Quiz History" : "Audio History"}
+          </button>
         </div>
 
         <div style={{ overflowX: "auto" }}>
-          <table style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            fontSize: "0.95rem"
-          }}>
-            <thead>
-              <tr style={{ backgroundColor: "#f2f2f2" }}>
-                <th style={thStyle}>Employee Number</th>
-                <th style={thStyle}>Name</th>
-                <th style={thStyle}>Dept</th>
-                <th style={thStyle}>Score</th>
-                <th style={thStyle}>Result</th>
-                <th style={thStyle}>Time</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pagedHistory.map((h, i) => (
-                <tr key={i} style={{ backgroundColor: i % 2 === 0 ? "#fff" : "#f9f9f9" }}>
-                  <td style={tdStyle}>{h.emp_num}</td>
-                  <td style={tdStyle}>{h.name}</td>
-                  <td style={tdStyle}>{h.department}</td>
-                  <td style={tdStyle}>{h.score}</td>
-                  <td style={{ ...tdStyle, fontWeight: "bold", color: h.pass ? "green" : "red" }}>
-                    {h.pass ? "✅ Pass" : "❌ Fail"}
-                  </td>
-                  <td style={tdStyle}>{new Date(h.timestamp).toLocaleString()}</td>
+          {showAudioHistory ? (
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.95rem" }}>
+              <thead>
+                <tr style={{ backgroundColor: "#f2f2f2" }}>
+                  <th style={thStyle}>Employee Number</th>
+                  <th style={thStyle}>Audio Name</th>
+                  <th style={thStyle}>Progress</th>
+                  <th style={thStyle}>Completed</th>
+                  <th style={thStyle}>Last Updated</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {pagedAudio.map((a, i) => (
+                  <tr key={i} style={{ backgroundColor: i % 2 === 0 ? "#fff" : "#f9f9f9" }}>
+                    <td style={tdStyle}>{a.emp_num}</td>
+                    <td style={tdStyle}>{a.audio_name}</td>
+                    <td style={tdStyle}>
+                      {a.duration < 60 
+                        ? `${a.duration} secs` 
+                        : `${(a.duration / 60).toFixed(1)} mins`}
+                    </td>
+
+                    <td style={{ ...tdStyle, fontWeight: "bold", color: a.completed ? "green" : "red" }}>
+                      {a.completed ? "✅ Yes" : "❌ No"}
+                    </td>
+                    <td style={tdStyle}>{new Date(a.listened_at).toLocaleString("en-US", {
+                      timeZone: "Asia/Shanghai",
+                      year: "numeric",
+                      month: "2-digit",
+                      day: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                      hour12: false,
+                      })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.95rem" }}>
+              <thead>
+                <tr style={{ backgroundColor: "#f2f2f2" }}>
+                  <th style={thStyle}>Employee Number</th>
+                  <th style={thStyle}>Name</th>
+                  <th style={thStyle}>Dept</th>
+                  <th style={thStyle}>Score</th>
+                  <th style={thStyle}>Result</th>
+                  <th style={thStyle}>Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pagedHistory.map((h, i) => (
+                  <tr key={i} style={{ backgroundColor: i % 2 === 0 ? "#fff" : "#f9f9f9" }}>
+                    <td style={tdStyle}>{h.emp_num}</td>
+                    <td style={tdStyle}>{h.name}</td>
+                    <td style={tdStyle}>{h.department}</td>
+                    <td style={tdStyle}>{h.score}</td>
+                    <td style={{ ...tdStyle, fontWeight: "bold", color: h.pass ? "green" : "red" }}>
+                      {h.pass ? "✅ Pass" : "❌ Fail"}
+                    </td>
+                    <td style={tdStyle}>{new Date(h.timestamp).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
 
+        {/* Pagination */}
         <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem' }}>
           <button
             disabled={historyPage === 1}
@@ -308,19 +432,24 @@ const QuizApp = () => {
           >
             Previous
           </button>
+
           <span style={{ fontWeight: 'bold' }}>
-            Page {historyPage} of {totalPages}
+            Page {historyPage} of {showAudioHistory ? totalPagesAudio : totalPagesHistory}
           </span>
+
           <button
-            disabled={historyPage === totalPages}
-            onClick={() => setHistoryPage((p) => Math.min(p + 1, totalPages))}
+            disabled={historyPage === (showAudioHistory ? totalPagesAudio : totalPagesHistory)}
+            onClick={() => setHistoryPage((p) => Math.min(
+              p + 1,
+              showAudioHistory ? totalPagesAudio : totalPagesHistory
+            ))}
             style={{
               padding: "0.4rem 1rem",
-              backgroundColor: historyPage === totalPages ? '#aaa' : '#007bff',
+              backgroundColor: historyPage === (showAudioHistory ? totalPagesAudio : totalPagesHistory) ? '#aaa' : '#007bff',
               color: 'white',
               border: 'none',
               borderRadius: '6px',
-              cursor: historyPage === totalPages ? 'not-allowed' : 'pointer',
+              cursor: historyPage === (showAudioHistory ? totalPagesAudio : totalPagesHistory) ? 'not-allowed' : 'pointer',
               transition: 'background-color 0.3s ease'
             }}
           >
@@ -330,6 +459,7 @@ const QuizApp = () => {
       </div>
     );
   }
+
 
   if (!welcomeComplete) {
     return (
@@ -373,7 +503,7 @@ const QuizApp = () => {
               if (/^\d*$/.test(value)) {
                 setEmployeeNo(value);
                 if (value.length < 8) {
-                  setEmployeeError("工号必须至少8位数字");
+                  setEmployeeError("请输入正确的工号");
                 } else {
                   setEmployeeError("");
                 }
