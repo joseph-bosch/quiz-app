@@ -10,7 +10,7 @@ import fontkit from "@pdf-lib/fontkit";
 import "./App.css";
 
 const QUESTIONS_URL = "/questions.json";
-const PASS_MARK = 90;
+const PASS_MARK = 100; // changed to 100%
 const ADMIN_NAMES = ["olarinde joseph", "li dongqin"];
 
 const QuizApp = () => {
@@ -67,7 +67,8 @@ const QuizApp = () => {
     fetch(QUESTIONS_URL)
       .then((res) => res.json())
       .then((data) => {
-        const shuffled = data.sort(() => 0.5 - Math.random()).slice(0, 10);
+        // choose 15 questions now (instead of 10)
+        const shuffled = data.sort(() => 0.5 - Math.random()).slice(0, 15);
         const questionsWithShuffledOptions = shuffled.map(q => ({
           ...q,
           options: [...q.options].sort(() => 0.5 - Math.random())
@@ -474,7 +475,7 @@ const QuizApp = () => {
           <h1>Hi👋，欢迎来到测验时间！</h1>
           <p>
             恭喜您完成培训课程！接下来的测验是帮助您复习刚才的重点，也是获得证书的最后一步啦！<br />
-            • 测验题数：10 题<br />• 轻松作答就好～<br />
+            • 测验题数：15 题<br />• 轻松作答就好～<br />
             别紧张，放轻松，您一定可以顺利完成！<br />准备好了吗？Let’s go 🚀🚀🚀
           </p>
           <button onClick={() => setWelcomeComplete(true)}>Start</button>

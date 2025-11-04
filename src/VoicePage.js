@@ -209,10 +209,10 @@ function VoicePage({ empNum, isAdmin, onBack }) {
   const formatAudioName = (name) => {
     const clean = name.split("_17")[0];
 
-    const withSpaces = clean.replace(/_/g, " ");
+    const withSpaces = clean.replace(/_/g, "  ");
 
     // Add a dot after the first number (if the name starts with one)
-    const formatted = withSpaces.replace(/^(\d+)\s*/, "$1. ");
+    const formatted = withSpaces.replace(/^(\d+)\s*/, " ");
 
     return formatted.trim();
   };
