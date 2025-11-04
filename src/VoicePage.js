@@ -10,7 +10,9 @@ import html2canvas from "html2canvas";
 function VoicePage({ empNum, isAdmin, onBack }) {
   const { audioName } = useParams();
   const navigate = useNavigate();
-  const [audios, setAudios] = useState([]);
+
+  const [audios, setAudios] = useState([]); // displayed (maybe single if QR)
+  const [allAudios, setAllAudios] = useState([]); // full list from storage
   const [listened, setListened] = useState({});
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -22,13 +24,9 @@ function VoicePage({ empNum, isAdmin, onBack }) {
   const [userPaused, setUserPaused] = useState(false);
   const audioRefs = useRef({});
 
-  // ✅ User info modal states
-  const [employeeNo, setEmployeeNo] = useState(
-    localStorage.getItem("employeeNo") || ""
-  );
-  const [department, setDepartment] = useState(
-    localStorage.getItem("department") || ""
-  );
+  // ✅ User info modal states (initialize from localStorage)
+  const [employeeNo, setEmployeeNo] = useState(localStorage.getItem("employeeNo") || "");
+  const [department, setDepartment] = useState(localStorage.getItem("department") || "");
   const [name, setName] = useState(localStorage.getItem("name") || "");
   const [employeeError, setEmployeeError] = useState("");
   const [showModal, setShowModal] = useState(!localStorage.getItem("employeeNo"));
@@ -52,14 +50,19 @@ function VoicePage({ empNum, isAdmin, onBack }) {
   const ignoreSeekRef = useRef({});
   const userSeekingRef = useRef({});
 
+  // Show quiz CTA state (for QR path)
+  const [othersCompleted, setOthersCompleted] = useState(false);
+
   useEffect(() => {
     fetchAudios();
+    // fetchListened uses effectiveEmpNum; run only after mount
     fetchListened();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // auto-play attempt for QR-opened audio
   useEffect(() => {
-    if (showModal) return; // ❌ Do nothing while modal is visible
+    if (showModal) return; // do nothing while modal visible
 
     const tryAutoPlay = () => {
       if (!audioName || audios.length === 0) return;
@@ -77,8 +80,9 @@ function VoicePage({ empNum, isAdmin, onBack }) {
         if (!userPaused) {
           audioEl.play().catch(() => {
             const resumeOnInteraction = () => {
-              if (!userPaused) {        // 🚨 only resume if user didn’t manually pause
-                audioEl.play()
+              if (!userPaused) {
+                audioEl
+                  .play()
                   .finally(() => {
                     window.removeEventListener("click", resumeOnInteraction);
                     window.removeEventListener("keydown", resumeOnInteraction);
@@ -90,17 +94,15 @@ function VoicePage({ empNum, isAdmin, onBack }) {
             window.addEventListener("keydown", resumeOnInteraction);
           });
         }
-
       };
 
-      // Slight delay to ensure modal fade-out completed
-      setTimeout(attemptPlay, 300);
+      setTimeout(attemptPlay, 300); // allow modal fade
     };
 
     tryAutoPlay();
-  }, [showModal, audios, audioName, listened]);
+  }, [showModal, audios, audioName, listened, userPaused]);
 
-
+  // Fetch list of audio files from storage
   const fetchAudios = async () => {
     const { data, error } = await supabase.storage
       .from("voice-audios")
@@ -117,16 +119,20 @@ function VoicePage({ empNum, isAdmin, onBack }) {
           return { name: file.name, url: publicUrlData.publicUrl };
         })
       );
+
+      // save full list and set displayed list depending on QR
+      setAllAudios(urls);
+
       const filtered = audioName
-        ? urls.filter(
-            (file) => file.name.replace(/\.[^/.]+$/, "") === audioName
-          )
+        ? urls.filter((file) => file.name.replace(/\.[^/.]+$/, "") === audioName)
         : urls;
+
       setAudios(filtered);
       setNotFound(Boolean(audioName && filtered.length === 0));
     }
   };
 
+  // Fetch listened rows for this user
   const fetchListened = async () => {
     if (!effectiveEmpNum) return;
     const { data, error } = await supabase
@@ -143,12 +149,42 @@ function VoicePage({ empNum, isAdmin, onBack }) {
     }
   };
 
+  // Recompute whether all *other* audios are completed (used for showing CTA)
+  useEffect(() => {
+    if (!allAudios || allAudios.length === 0) {
+      setOthersCompleted(false);
+      return;
+    }
+    if (!audioName) {
+      setOthersCompleted(false);
+      return;
+    }
+
+    const current = allAudios.find(
+      (a) => a.name.replace(/\.[^/.]+$/, "") === audioName
+    );
+    const currentName = current?.name;
+    if (!currentName) {
+      setOthersCompleted(false);
+      return;
+    }
+
+    const otherNames = allAudios.map((a) => a.name).filter((n) => n !== currentName);
+    const ok = otherNames.every((n) => listened[n]?.completed === true);
+    setOthersCompleted(ok);
+  }, [allAudios, listened, audioName]);
+
+  // Save user info from modal; then fetch listened progress for that user
   const handleSaveUserInfo = () => {
     if (!department.trim() || !name.trim() || employeeNo.length < 8) return;
     localStorage.setItem("employeeNo", employeeNo);
     localStorage.setItem("department", department);
     localStorage.setItem("name", name);
     setShowModal(false);
+
+    // immediately load user's listened progress
+    // small delay to ensure localStorage writes are done
+    setTimeout(() => fetchListened(), 50);
   };
 
   const handleUpload = async () => {
@@ -194,13 +230,9 @@ function VoicePage({ empNum, isAdmin, onBack }) {
   };
 
   const handleDelete = async (fileName) => {
-    const confirmed = window.confirm(
-      `Are you sure you want to delete ${fileName}?`
-    );
+    const confirmed = window.confirm(`Are you sure you want to delete ${fileName}?`);
     if (!confirmed) return;
-    const { error } = await supabase.storage
-      .from("voice-audios")
-      .remove([fileName]);
+    const { error } = await supabase.storage.from("voice-audios").remove([fileName]);
     if (!error) {
       fetchAudios();
     }
@@ -208,28 +240,18 @@ function VoicePage({ empNum, isAdmin, onBack }) {
 
   const formatAudioName = (name) => {
     const clean = name.split("_17")[0];
-
     const withSpaces = clean.replace(/_/g, "  ");
-
-    // Add a dot after the first number (if the name starts with one)
     const formatted = withSpaces.replace(/^(\d+)\s*/, " ");
-
     return formatted.trim();
   };
 
-
-  const handleDownloadQR = async (audioName) => {
-    const qrWrapper = document.getElementById(`qr-wrapper-${audioName}`);
-    if (!qrWrapper) return;
-
+  const handleDownloadQR = async (audioNameParam) => {
+    const el = document.getElementById(`qr-wrapper-${audioNameParam}`);
+    if (!el) return;
     try {
-      const canvas = await html2canvas(qrWrapper, {
-        backgroundColor: "#ffffff", // white background
-        scale: 2, // higher resolution
-      });
-
+      const canvas = await html2canvas(el, { backgroundColor: "#ffffff", scale: 2 });
       const link = document.createElement("a");
-      link.download = `${formatAudioName(audioName)}_QR.png`;
+      link.download = `${formatAudioName(audioNameParam)}_QR.png`;
       link.href = canvas.toDataURL("image/png");
       link.click();
     } catch (error) {
@@ -237,17 +259,16 @@ function VoicePage({ empNum, isAdmin, onBack }) {
     }
   };
 
-
-
+  // Commit progress locally + to DB (insert or update)
   const commitProgress = async (audio, el, forceComplete = false) => {
     if (!el) return;
 
     const total = Number(el.duration) || 0;
     const current = Number(el.currentTime) || 0;
     const listenedSeconds = Math.floor(current);
-    const isCompleted =
-      forceComplete || (total ? current / total >= 0.95 : false);
+    const isCompleted = forceComplete || (total ? current / total >= 0.95 : false);
 
+    // update UI state immediately
     setListened((prev) => ({
       ...prev,
       [audio.name]: {
@@ -259,6 +280,7 @@ function VoicePage({ empNum, isAdmin, onBack }) {
 
     if (!effectiveEmpNum) return;
 
+    // find existing row
     const { data: existing, error: findErr } = await supabase
       .from("audio_progress")
       .select("id")
@@ -266,29 +288,40 @@ function VoicePage({ empNum, isAdmin, onBack }) {
       .eq("audio_name", audio.name)
       .maybeSingle();
 
-    if (findErr) return;
+    if (findErr) {
+      console.error("findErr", findErr);
+      return;
+    }
 
-    if (existing) {
-      await supabase
-        .from("audio_progress")
-        .update({ duration: listenedSeconds, completed: isCompleted })
-        .eq("id", existing.id);
-    } else {
-      await supabase.from("audio_progress").insert({
-        emp_num: effectiveEmpNum,
-        audio_name: audio.name,
-        duration: listenedSeconds,
-        completed: isCompleted,
-        department: department,
-        user_name: name,
-      });
+    try {
+      if (existing) {
+        await supabase
+          .from("audio_progress")
+          .update({ duration: listenedSeconds, completed: isCompleted })
+          .eq("id", existing.id);
+      } else {
+        await supabase.from("audio_progress").insert({
+          emp_num: effectiveEmpNum,
+          audio_name: audio.name,
+          duration: listenedSeconds,
+          completed: isCompleted,
+          department: department,
+          user_name: name,
+        });
+      }
+    } catch (err) {
+      console.error("commitProgress error:", err);
+    } finally {
+      // refresh listened map from DB to get canonical state & timestamps
+      // (keeps local state in sync)
+      fetchListened();
     }
   };
 
-  const updateProgress = (audioName, current, total) => {
+  const updateProgress = (audioNameParam, current, total) => {
     setProgress((prev) => ({
       ...prev,
-      [audioName]: {
+      [audioNameParam]: {
         percent: total ? (current / total) * 100 : 0,
         current,
         total,
@@ -303,10 +336,7 @@ function VoicePage({ empNum, isAdmin, onBack }) {
   };
 
   const toggleQR = (audio) => {
-    setShowQR((prev) => ({
-      ...prev,
-      [audio.name]: !prev[audio.name],
-    }));
+    setShowQR((prev) => ({ ...prev, [audio.name]: !prev[audio.name] }));
   };
 
   const tolerance = 1.0;
@@ -365,6 +395,24 @@ function VoicePage({ empNum, isAdmin, onBack }) {
     }
   };
 
+  // locate the current single audio object if present (QR opens single)
+  const currentAudio = audios && audios.length > 0 ? audios[0] : null;
+  const currentCompleted = currentAudio ? listened[currentAudio.name]?.completed : false;
+
+  // Start quiz helper (explicit function)
+  const startQuizFromAudio = () => {
+    // persist user data so QuizApp can read it
+    if (employeeNo) localStorage.setItem("employeeNo", employeeNo);
+    if (name) localStorage.setItem("name", name);
+    if (department) localStorage.setItem("department", department);
+
+    // set flag that QuizApp checks to auto-start
+    localStorage.setItem("startQuizNow", "1");
+
+    // navigate to quiz root (HashRouter "#/")
+    navigate("/");
+  };
+
   return (
     <div className="voice-page">
       {showModal && (
@@ -397,26 +445,9 @@ function VoicePage({ empNum, isAdmin, onBack }) {
               placeholder="选择部门"
               onChange={(selected) => setDepartment(selected ? selected.value : "")}
               styles={{
-                container: (base) => ({
-                  ...base,
-                  width: "275px",
-                  borderRadius: "12px",
-                  color: "black",
-                  margin: "0 auto",
-                }),
-                control: (base) => ({
-                  ...base,
-                  borderRadius: "8px",
-                  fontSize: "12px",
-                  textAlign: "left",
-                  minHeight: "40px",
-                  paddingLeft: "5px",
-                }),
-                placeholder: (base) => ({
-                  ...base,
-                  textAlign: "left",
-                  marginLeft: 0,
-                }),
+                container: (base) => ({ ...base, width: "275px", borderRadius: "12px", color: "black", margin: "0 auto" }),
+                control: (base) => ({ ...base, borderRadius: "8px", fontSize: "12px", textAlign: "left", minHeight: "40px", paddingLeft: "5px" }),
+                placeholder: (base) => ({ ...base, textAlign: "left", marginLeft: 0 }),
               }}
             />
 
@@ -430,21 +461,13 @@ function VoicePage({ empNum, isAdmin, onBack }) {
 
             <button
               onClick={handleSaveUserInfo}
-              disabled={
-                !department.trim() || !name.trim() || employeeNo.length < 8
-              }
+              disabled={!department.trim() || !name.trim() || employeeNo.length < 8}
               style={{
-                backgroundColor:
-                  !department.trim() || !name.trim() || employeeNo.length < 8
-                    ? "#ccc"
-                    : "#4CAF50",
+                backgroundColor: !department.trim() || !name.trim() || employeeNo.length < 8 ? "#ccc" : "#4CAF50",
                 color: "white",
                 padding: "8px 16px",
                 border: "none",
-                cursor:
-                  !department.trim() || !name.trim() || employeeNo.length < 8
-                    ? "not-allowed"
-                    : "pointer",
+                cursor: !department.trim() || !name.trim() || employeeNo.length < 8 ? "not-allowed" : "pointer",
                 marginTop: "10px",
               }}
             >
@@ -469,38 +492,18 @@ function VoicePage({ empNum, isAdmin, onBack }) {
         <>
           {isAdmin && (
             <div className="upload-section">
-              <input
-                type="file"
-                onChange={(e) => setSelectedFile(e.target.files[0])}
-              />
-
-              <button
-                onClick={handleUpload}
-                disabled={uploading || !selectedFile}
-              >
+              <input type="file" onChange={(e) => setSelectedFile(e.target.files[0])} />
+              <button onClick={handleUpload} disabled={uploading || !selectedFile}>
                 {uploading ? `上传中 (${uploadProgress}%)...` : "上传音频"}
               </button>
 
               {uploading && (
-                <div
-                  className="upload-progress-bar"
-                  style={{ marginTop: "10px" }}
-                >
-                  <div
-                    className="upload-progress-fill"
-                    style={{
-                      width: `${uploadProgress}%`,
-                      height: "8px",
-                      backgroundColor: "#4caf50",
-                      transition: "width 0.3s",
-                    }}
-                  />
+                <div className="upload-progress-bar" style={{ marginTop: "10px" }}>
+                  <div className="upload-progress-fill" style={{ width: `${uploadProgress}%`, height: "8px", backgroundColor: "#4caf50", transition: "width 0.3s" }} />
                 </div>
               )}
 
-              {uploadStatus && (
-                <div className="upload-status">{uploadStatus}</div>
-              )}
+              {uploadStatus && <div className="upload-status">{uploadStatus}</div>}
             </div>
           )}
 
@@ -512,10 +515,7 @@ function VoicePage({ empNum, isAdmin, onBack }) {
               const qrUrl = `${window.location.origin}/#/audioPage/${cleanName}`;
 
               return (
-                <div
-                  key={audio.name}
-                  className={`audio-item ${listenedClass}`}
-                >
+                <div key={audio.name} className={`audio-item ${listenedClass}`}>
                   <strong>{audio.name}</strong>
 
                   <audio
@@ -523,16 +523,12 @@ function VoicePage({ empNum, isAdmin, onBack }) {
                     controlsList="nodownload noplaybackrate noremoteplayback"
                     disablePictureInPicture
                     ref={(el) => (audioRefs.current[audio.name] = el)}
-                    onLoadedMetadata={(e) =>
-                      handleLoadedMetadata(audio, e.target)
-                    }
-                    onTimeUpdate={(e) =>
-                      handleTimeUpdateGuarded(audio, e.target)
-                    }
+                    onLoadedMetadata={(e) => handleLoadedMetadata(audio, e.target)}
+                    onTimeUpdate={(e) => handleTimeUpdateGuarded(audio, e.target)}
                     onSeeking={(e) => handleSeeking(audio, e.target)}
                     onSeeked={(e) => handleSeeked(audio, e.target)}
                     onRateChange={handleRateChange}
-                    onPause={(e) => {setUserPaused(true); e.target.pause(); commitProgress(audio, e.target)}}
+                    onPause={(e) => { setUserPaused(true); e.target.pause(); commitProgress(audio, e.target); }}
                     onPlay={() => setUserPaused(false)}
                     onEnded={(e) => commitProgress(audio, e.target, true)}
                   >
@@ -540,28 +536,15 @@ function VoicePage({ empNum, isAdmin, onBack }) {
                   </audio>
 
                   {listenedEntry?.completed && <div>✅ 完成了</div>}
-                  {!listenedEntry?.completed &&
-                    listenedEntry?.duration > 0 && (
-                      <div>
-                        ⏱️已听<b>{listenedEntry.duration}</b>秒
-                      </div>
-                    )}
+                  {!listenedEntry?.completed && listenedEntry?.duration > 0 && (
+                    <div>⏱️已听<b>{listenedEntry.duration}</b>秒</div>
+                  )}
 
                   {isAdmin && (
                     <>
-                      <button
-                        className="delete-button"
-                        onClick={() => handleDelete(audio.name)}
-                      >
-                        🗑️ 删除
-                      </button>
+                      <button className="delete-button" onClick={() => handleDelete(audio.name)}>🗑️ 删除</button>
 
-                      <button
-                        className="qrCode-button"
-                        onClick={() => toggleQR(audio)}
-                      >
-                        📷 创建二维码
-                      </button>
+                      <button className="qrCode-button" onClick={() => toggleQR(audio)}>📷 创建二维码</button>
 
                       {showQR[audio.name] && (
                         <div
@@ -578,7 +561,7 @@ function VoicePage({ empNum, isAdmin, onBack }) {
                         >
                           <QRCodeCanvas value={qrUrl} size={138} />
 
-                          {/* ✅ Clickable audio name (in uppercase) */}
+                          {/* Clickable audio name (in uppercase) */}
                           <span
                             onClick={() => handleDownloadQR(audio.name)}
                             style={{
@@ -597,11 +580,33 @@ function VoicePage({ empNum, isAdmin, onBack }) {
                       )}
                     </>
                   )}
-
                 </div>
               );
             })}
           </div>
+
+          {/* ======== Quiz CTA (QR path only): show if all other audios completed ======== */}
+          {audioName && othersCompleted && currentAudio && (
+            <div style={{ marginTop: 20, textAlign: "center" }}>
+              <button
+                onClick={startQuizFromAudio}
+                disabled={!currentCompleted}
+                style={{
+                  backgroundColor: currentCompleted ? "#4CAF50" : "#ccc",
+                  color: "white",
+                  padding: "10px 18px",
+                  border: "none",
+                  borderRadius: "8px",
+                  cursor: currentCompleted ? "pointer" : "not-allowed",
+                  fontSize: "16px",
+                }}
+                title={currentCompleted ? "进入测验" : "请先完整收听当前音频以解锁测验"}
+              >
+                🎓 开始测验
+              </button>
+              {!currentCompleted && <div style={{ color: "#666", fontSize: 13, marginTop: 8 }}>请先完成当前音频以解锁测验</div>}
+            </div>
+          )}
         </>
       )}
     </div>
@@ -609,6 +614,8 @@ function VoicePage({ empNum, isAdmin, onBack }) {
 }
 
 export default VoicePage;
+
+
 
 
 // https://youtu.be/RSN_We4Myx8
