@@ -5,6 +5,7 @@ import Select from "react-select";
 import { supabase } from "./supabaseClient";
 import { QRCodeCanvas } from "qrcode.react";
 import "./VoicePage.css";
+import html2canvas from "html2canvas";
 
 function VoicePage({ empNum, isAdmin, onBack }) {
   const { audioName } = useParams();
@@ -204,6 +205,39 @@ function VoicePage({ empNum, isAdmin, onBack }) {
       fetchAudios();
     }
   };
+
+  const formatAudioName = (name) => {
+    const clean = name.split("_17")[0];
+
+    const withSpaces = clean.replace(/_/g, " ");
+
+    // Add a dot after the first number (if the name starts with one)
+    const formatted = withSpaces.replace(/^(\d+)\s*/, "$1. ");
+
+    return formatted.trim();
+  };
+
+
+  const handleDownloadQR = async (audioName) => {
+    const qrWrapper = document.getElementById(`qr-wrapper-${audioName}`);
+    if (!qrWrapper) return;
+
+    try {
+      const canvas = await html2canvas(qrWrapper, {
+        backgroundColor: "#ffffff", // white background
+        scale: 2, // higher resolution
+      });
+
+      const link = document.createElement("a");
+      link.download = `${formatAudioName(audioName)}_QR.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    } catch (error) {
+      console.error("Error downloading QR code:", error);
+    }
+  };
+
+
 
   const commitProgress = async (audio, el, forceComplete = false) => {
     if (!el) return;
@@ -521,19 +555,49 @@ function VoicePage({ empNum, isAdmin, onBack }) {
                       >
                         🗑️ 删除
                       </button>
+
                       <button
                         className="qrCode-button"
                         onClick={() => toggleQR(audio)}
                       >
                         📷 创建二维码
                       </button>
+
                       {showQR[audio.name] && (
-                        <div style={{ marginTop: "10px" }}>
-                          <QRCodeCanvas value={qrUrl} size={128} />
+                        <div
+                          id={`qr-wrapper-${audio.name}`}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "10px",
+                            marginTop: "10px",
+                            background: "#fff",
+                            padding: "8px 12px",
+                            borderRadius: "8px",
+                          }}
+                        >
+                          <QRCodeCanvas value={qrUrl} size={138} />
+
+                          {/* ✅ Clickable audio name (in uppercase) */}
+                          <span
+                            onClick={() => handleDownloadQR(audio.name)}
+                            style={{
+                              cursor: "pointer",
+                              textTransform: "uppercase",
+                              fontWeight: "bold",
+                              color: "#0078d7",
+                              fontSize: "15px",
+                              wordBreak: "break-word",
+                              maxWidth: "120px",
+                            }}
+                          >
+                            {formatAudioName(audio.name)}
+                          </span>
                         </div>
                       )}
                     </>
                   )}
+
                 </div>
               );
             })}
