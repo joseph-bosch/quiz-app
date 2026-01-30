@@ -9,13 +9,17 @@ import fontkit from "@pdf-lib/fontkit";
 import "./App.css";
 
 const QUESTIONS_URL = "/questions.json";
-const PASS_MARK = 100; // must get 100% (all 15) to pass
+const PASS_MARK = 80; // must get 100% to pass
+
 const ADMIN_NAMES = ["olarinde joseph", "li dongqin"];
+
+// ✅ Toggle question count here
+const USE_LIMITED_QUESTIONS = true;   // true = use QUESTION_LIMIT random questions, false = use all questions
+const QUESTION_LIMIT = 10;
 
 const QuizApp = () => {
   const navigate = useNavigate();
 
-  // initialize department from localStorage so when user comes from VoicePage it's preserved
   const [questions, setQuestions] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState({});
@@ -38,6 +42,9 @@ const QuizApp = () => {
   const [showAudioHistory, setShowAudioHistory] = useState(false);
   const [audioProgress, setAudioProgress] = useState([]);
 
+  // explanation state (only used when correct)
+  const [explainState, setExplainState] = useState(null); // { qIndex, option, text, ts }
+
   const departments = [
     "BD/SLP-CO2", "C/TXR-CN-D4", "GR/FCM-Shz", "GS/OBR23-APAC17", "GS/OSD4-APAC16",
     "GS/PSD5-AP", "MA/HRL-Shz", "MA-WS/PAS-EAA-CN", "MA-WS/PAW-ENG1-CN", "MA-WS/PAW-ENG2-CN",
@@ -55,7 +62,19 @@ const QuizApp = () => {
   const thStyle = { padding: "0.75rem", borderBottom: "1px solid #ccc", textAlign: "left" };
   const tdStyle = { padding: "0.75rem", borderBottom: "1px solid #eee" };
 
-  // If VoicePage stored startQuizNow, use it to auto-start (VoicePage should set dept too)
+  const isAnswerCorrect = (question, selected) => {
+    if (!question) return false;
+
+    if (Array.isArray(question.correct)) {
+      if (!Array.isArray(selected)) return false;
+      const sortedSelected = [...selected].sort();
+      const sortedCorrect = [...question.correct].sort();
+      return JSON.stringify(sortedSelected) === JSON.stringify(sortedCorrect);
+    }
+    return selected === question.correct;
+  };
+
+  // If VoicePage stored startQuizNow, use it to auto-start
   useEffect(() => {
     const flag = localStorage.getItem("startQuizNow");
     if (flag) {
@@ -76,31 +95,44 @@ const QuizApp = () => {
     fetch(QUESTIONS_URL)
       .then((res) => res.json())
       .then((data) => {
-        const shuffled = data.sort(() => 0.5 - Math.random()).slice(0, 15);
-        const questionsWithShuffledOptions = shuffled.map(q => ({
+        const shuffledAll = [...data].sort(() => 0.5 - Math.random());
+
+        const takeCount = USE_LIMITED_QUESTIONS
+          ? Math.min(QUESTION_LIMIT, shuffledAll.length)
+          : shuffledAll.length;
+
+        const picked = shuffledAll.slice(0, takeCount);
+
+        const questionsWithShuffledOptions = picked.map(q => ({
           ...q,
           options: [...q.options].sort(() => 0.5 - Math.random())
         }));
+
         setQuestions(questionsWithShuffledOptions);
         setAnswers({});
         setScore(0);
         setCurrentIndex(0);
         setSubmitted(false);
         setInsertError(null);
+        setExplainState(null);
       })
       .catch((err) => console.error("Failed to load questions.json", err));
   };
 
   useEffect(() => { if (started) loadShuffledQuestions(); }, [started]);
-
   useEffect(() => { if (showHistory) { fetchAllHistory(); fetchAudioProgress(); } }, [showHistory]);
 
   const fetchAllHistory = async () => {
     let allData = [], from = 0, batchSize = 1000, moreData = true;
     while (moreData) {
-      const { data, error } = await supabase.from("scores").select("*").order("timestamp", { ascending: false }).range(from, from + batchSize - 1);
+      const { data, error } = await supabase
+        .from("scores")
+        .select("*")
+        .order("timestamp", { ascending: false })
+        .range(from, from + batchSize - 1);
       if (error) { console.error("History fetch error:", error.message); break; }
-      if (data && data.length > 0) { allData = [...allData, ...data]; from += batchSize; } else moreData = false;
+      if (data && data.length > 0) { allData = [...allData, ...data]; from += batchSize; }
+      else moreData = false;
     }
     setAllHistory(allData);
   };
@@ -108,24 +140,81 @@ const QuizApp = () => {
   const fetchAudioProgress = async () => {
     let allAudio = [], from = 0, batchSize = 1000, moreData = true;
     while (moreData) {
-      const { data, error } = await supabase.from("audio_progress").select("*").order("listened_at", { ascending: false }).range(from, from + batchSize - 1);
+      const { data, error } = await supabase
+        .from("audio_progress")
+        .select("*")
+        .order("listened_at", { ascending: false })
+        .range(from, from + batchSize - 1);
       if (error) { console.error("Audio progress fetch error:", error.message); break; }
-      if (data && data.length > 0) { allAudio = [...allAudio, ...data]; from += batchSize; } else moreData = false;
+      if (data && data.length > 0) { allAudio = [...allAudio, ...data]; from += batchSize; }
+      else moreData = false;
     }
     setAudioProgress(allAudio);
   };
 
+  // ✅ LOCK RULE:
+  // If question has answer_explain AND it is single-choice, once selected -> locked (can't change)
+  const isLockedSingleChoice = (question, qIndex) => {
+    if (!question) return false;
+    const isMultiple = Array.isArray(question.correct);
+    if (isMultiple) return false; // user asked "select one answer" → lock single-choice only
+    if (!question.answer_explain) return false;
+    return !!answers[qIndex];
+  };
+
   const handleSelect = (option) => {
-    const currentQuestion = questions[currentIndex];
-    const isMultiple = Array.isArray(currentQuestion.correct);
+    const q = questions[currentIndex];
+    const isMultiple = Array.isArray(q.correct);
+
+    // If locked, do nothing
+    if (isLockedSingleChoice(q, currentIndex)) return;
+
     if (isMultiple) {
       const selected = answers[currentIndex] || [];
-      const newSelected = selected.includes(option) ? selected.filter(i => i !== option) : [...selected, option];
-      setAnswers({ ...answers, [currentIndex]: newSelected });
+      const newSelected = selected.includes(option)
+        ? selected.filter(i => i !== option)
+        : [...selected, option];
+
+      const nextAnswers = { ...answers, [currentIndex]: newSelected };
+      setAnswers(nextAnswers);
+
+      const nowCorrect = isAnswerCorrect(q, newSelected);
+      if (nowCorrect && q.answer_explain) {
+        const attachOpt =
+          Array.isArray(q.correct) && q.correct.includes(option)
+            ? option
+            : (Array.isArray(q.correct) ? q.correct[0] : option);
+
+        setExplainState({
+          qIndex: currentIndex,
+          option: attachOpt,
+          text: q.answer_explain,
+          ts: Date.now(),
+        });
+      } else {
+        if (explainState?.qIndex === currentIndex) setExplainState(null);
+      }
     } else {
-      setAnswers({ ...answers, [currentIndex]: option });
-      setTimeout(() => { if (currentIndex < questions.length - 1) setCurrentIndex(currentIndex + 1); }, 300);
+      const nextAnswers = { ...answers, [currentIndex]: option };
+      setAnswers(nextAnswers);
+
+      const nowCorrect = isAnswerCorrect(q, option);
+      if (nowCorrect && q.answer_explain) {
+        setExplainState({
+          qIndex: currentIndex,
+          option,
+          text: q.answer_explain,
+          ts: Date.now(),
+        });
+      } else {
+        setExplainState(null);
+      }
     }
+  };
+
+  const goNext = () => {
+    setExplainState(null);
+    setCurrentIndex((idx) => Math.min(idx + 1, questions.length - 1));
   };
 
   const exportToExcel = () => {
@@ -138,20 +227,19 @@ const QuizApp = () => {
           "Department": row.department,
           "Audio Name": row.audio_name,
           Completed: row.completed ? "Yes" : "No",
-          Progress:  row.duration < 60 ? `${row.duration} secs` : `${(row.duration / 60).toFixed(1)} mins`,
+          Progress: row.duration < 60 ? `${row.duration} secs` : `${(row.duration / 60).toFixed(1)} mins`,
           "Last Updated": new Date(row.listened_at).toLocaleString(),
         };
-      } else {
-        return {
-          Name: row.name,
-          "Employee No": row.emp_num || '',
-          "Department": row.department,
-          Score: row.score,
-          Total: row.total,
-          Result: row.pass ? "Pass" : "Fail",
-          Time: new Date(row.timestamp).toLocaleString(),
-        };
       }
+      return {
+        Name: row.name,
+        "Employee No": row.emp_num || '',
+        "Department": row.department,
+        Score: row.score,
+        Total: row.total,
+        Result: row.pass ? "Pass" : "Fail",
+        Time: new Date(row.timestamp).toLocaleString(),
+      };
     });
 
     const worksheet = XLSX.utils.json_to_sheet(mappedData);
@@ -162,19 +250,15 @@ const QuizApp = () => {
     XLSX.writeFile(workbook, fileName);
   };
 
-  const isAnswerCorrect = (question, selected) => {
-    if (Array.isArray(question.correct)) {
-      if (!Array.isArray(selected)) return false;
-      const sortedSelected = [...selected].sort();
-      const sortedCorrect = [...question.correct].sort();
-      return JSON.stringify(sortedSelected) === JSON.stringify(sortedCorrect);
-    } else return selected === question.correct;
-  };
-
   const handleSubmit = async () => {
-    const finalScore = questions.reduce((acc, q, i) => acc + (isAnswerCorrect(q, answers[i]) ? 1 : 0), 0);
+    const finalScore = questions.reduce(
+      (acc, q, i) => acc + (isAnswerCorrect(q, answers[i]) ? 1 : 0),
+      0
+    );
     setScore(finalScore);
     setSubmitted(true);
+    setExplainState(null);
+
     try {
       await supabase.from("scores").insert([{
         name: name.trim(),
@@ -191,7 +275,14 @@ const QuizApp = () => {
   };
 
   const resetQuiz = () => {
-    setQuestions([]); setAnswers({}); setScore(0); setCurrentIndex(0); setSubmitted(false); setStarted(false); setInsertError(null);
+    setQuestions([]);
+    setAnswers({});
+    setScore(0);
+    setCurrentIndex(0);
+    setSubmitted(false);
+    setStarted(false);
+    setInsertError(null);
+    setExplainState(null);
   };
 
   const fetchHistory = async () => {
@@ -199,11 +290,10 @@ const QuizApp = () => {
     if (!error && data) setHistoryData(data);
   };
 
+  // ======= HISTORY VIEW (unchanged) =======
   if (showHistory) {
-    const totalPagesHistory = Math.ceil(allHistory.length / ITEMS_PER_PAGE);
     const startIndexHistory = (historyPage - 1) * ITEMS_PER_PAGE;
     const pagedHistory = allHistory.slice(startIndexHistory, startIndexHistory + ITEMS_PER_PAGE);
-    const totalPagesAudio = Math.ceil(audioProgress.length / ITEMS_PER_PAGE);
     const startIndexAudio = (historyPage - 1) * ITEMS_PER_PAGE;
     const pagedAudio = audioProgress.slice(startIndexAudio, startIndexAudio + ITEMS_PER_PAGE);
 
@@ -220,12 +310,33 @@ const QuizApp = () => {
           {showAudioHistory ? (
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.95rem" }}>
               <thead><tr style={{ backgroundColor: "#f2f2f2" }}><th style={thStyle}>Employee Number</th><th style={thStyle}>Audio Name</th><th style={thStyle}>Progress</th><th style={thStyle}>Completed</th><th style={thStyle}>Last Updated</th></tr></thead>
-              <tbody>{pagedAudio.map((a, i) => (<tr key={i} style={{ backgroundColor: i % 2 === 0 ? "#fff" : "#f9f9f9" }}><td style={tdStyle}>{a.emp_num}</td><td style={tdStyle}>{a.audio_name}</td><td style={tdStyle}>{a.duration < 60 ? `${a.duration} secs` : `${(a.duration / 60).toFixed(1)} mins`}</td><td style={{ ...tdStyle, fontWeight: "bold", color: a.completed ? "green" : "red" }}>{a.completed ? "✅ Yes" : "❌ No"}</td><td style={tdStyle}>{new Date(a.listened_at).toLocaleString("en-US", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}</td></tr>))}</tbody>
+              <tbody>
+                {pagedAudio.map((a, i) => (
+                  <tr key={i} style={{ backgroundColor: i % 2 === 0 ? "#fff" : "#f9f9f9" }}>
+                    <td style={tdStyle}>{a.emp_num}</td>
+                    <td style={tdStyle}>{a.audio_name}</td>
+                    <td style={tdStyle}>{a.duration < 60 ? `${a.duration} secs` : `${(a.duration / 60).toFixed(1)} mins`}</td>
+                    <td style={{ ...tdStyle, fontWeight: "bold", color: a.completed ? "green" : "red" }}>{a.completed ? "✅ Yes" : "❌ No"}</td>
+                    <td style={tdStyle}>{new Date(a.listened_at).toLocaleString("en-US", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}</td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.95rem" }}>
               <thead><tr style={{ backgroundColor: "#f2f2f2" }}><th style={thStyle}>Employee Number</th><th style={thStyle}>Name</th><th style={thStyle}>Dept</th><th style={thStyle}>Score</th><th style={thStyle}>Result</th><th style={thStyle}>Time</th></tr></thead>
-              <tbody>{pagedHistory.map((h, i) => (<tr key={i} style={{ backgroundColor: i % 2 === 0 ? "#fff" : "#f9f9f9" }}><td style={tdStyle}>{h.emp_num}</td><td style={tdStyle}>{h.name}</td><td style={tdStyle}>{h.department}</td><td style={tdStyle}>{h.score}</td><td style={{ ...tdStyle, fontWeight: "bold", color: h.pass ? "green" : "red" }}>{h.pass ? "✅ Pass" : "❌ Fail"}</td><td style={tdStyle}>{new Date(h.timestamp).toLocaleString()}</td></tr>))}</tbody>
+              <tbody>
+                {pagedHistory.map((h, i) => (
+                  <tr key={i} style={{ backgroundColor: i % 2 === 0 ? "#fff" : "#f9f9f9" }}>
+                    <td style={tdStyle}>{h.emp_num}</td>
+                    <td style={tdStyle}>{h.name}</td>
+                    <td style={tdStyle}>{h.department}</td>
+                    <td style={tdStyle}>{h.score}</td>
+                    <td style={{ ...tdStyle, fontWeight: "bold", color: h.pass ? "green" : "red" }}>{h.pass ? "✅ Pass" : "❌ Fail"}</td>
+                    <td style={tdStyle}>{new Date(h.timestamp).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           )}
         </div>
@@ -239,42 +350,97 @@ const QuizApp = () => {
     );
   }
 
+  // ======= WELCOME =======
   if (!welcomeComplete) {
     return (
       <div className="quiz-screen" style={{ background: `url('/images/quiz.png') no-repeat center center / cover`, minHeight: '100vh' }}>
         <div className="start-content" style={{ color: 'black' }}>
           <h1>Hi👋，欢迎来到测验时间！</h1>
-          <p>恭喜您完成培训课程！接下来的测验是帮助您复习刚才的重点，也是获得证书的最后一步啦！<br />• 测验题数：15 题<br />• 轻松作答就好～<br />别紧张，放轻松，您一定可以顺利完成！<br />准备好了吗？Let’s go 🚀🚀🚀</p>
+          <p>恭喜您完成培训课程！接下来的测验是帮助您复习刚才的重点，也是获得证书的最后一步啦！<br />• 测验题数：{USE_LIMITED_QUESTIONS ? QUESTION_LIMIT : "全部"} 题<br />• 轻松作答就好～<br />别紧张，放轻松，您一定可以顺利完成！<br />准备好了吗？Let’s go 🚀🚀🚀</p>
           <button onClick={() => setWelcomeComplete(true)}>Start</button>
         </div>
       </div>
     );
   }
 
+  // ======= START SCREEN =======
   if (!started && !showHistory) {
     return (
       <div className="quiz-screen" style={{ background: `url('/images/quiz.png') no-repeat center center / cover`, minHeight: '100vh' }}>
         <div className="start-content">
           <h1 style={{ color: 'black' }}>🎓 请输入您的信息</h1>
 
-          <input type="text" value={employeeNo} onChange={(e) => { const value = e.target.value; if (/^\d*$/.test(value)) { setEmployeeNo(value); if (value.length < 8) setEmployeeError("请输入正确的工号"); else setEmployeeError(""); } }} placeholder="工号" style={{ width: "250px" }} />
+          <input
+            type="text"
+            value={employeeNo}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (/^\d*$/.test(value)) {
+                setEmployeeNo(value);
+                if (value.length < 8) setEmployeeError("请输入正确的工号");
+                else setEmployeeError("");
+              }
+            }}
+            placeholder="工号"
+            style={{ width: "250px" }}
+          />
           {employeeError && <p style={{ color: "red", fontSize: "12px", margin: "4px 0 10px 0" }}>{employeeError}</p>}
 
-          <Select options={departments} value={departments.find((d) => d.value === department)} placeholder="选择部门" onChange={(selected) => setDepartment(selected ? selected.value : "")} styles={{ container: (base) => ({ ...base, width: "275px", borderRadius: "12px", color: "black", margin: "0 auto" }), control: (base) => ({ ...base, borderRadius: "8px", fontSize: "12px", textAlign: "left", minHeight: "40px", paddingLeft: "5px" }), placeholder: (base) => ({ ...base, textAlign: "left", marginLeft: 0 }) }} />
+          <Select
+            options={departments}
+            value={departments.find((d) => d.value === department)}
+            placeholder="选择部门"
+            onChange={(selected) => setDepartment(selected ? selected.value : "")}
+            styles={{
+              container: (base) => ({ ...base, width: "275px", borderRadius: "12px", color: "black", margin: "0 auto" }),
+              control: (base) => ({ ...base, borderRadius: "8px", fontSize: "12px", textAlign: "left", minHeight: "40px", paddingLeft: "5px" }),
+              placeholder: (base) => ({ ...base, textAlign: "left", marginLeft: 0 })
+            }}
+          />
 
           <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="姓名" style={{ width: "250px" }} />
           <br />
 
-          <button onClick={() => { localStorage.setItem("employeeNo", employeeNo); localStorage.setItem("name", name); localStorage.setItem("department", department); setStarted(true); }} disabled={!department.trim() || !name.trim() || employeeNo.length < 8} style={{ backgroundColor: !department.trim() || !name.trim() || employeeNo.length < 8 ? "#ccc" : "#4CAF50", color: "white", padding: "8px 16px", border: "none", cursor: !department.trim() || !name.trim() || employeeNo.length < 8 ? "not-allowed" : "pointer" }}>开始测验</button>
+          <button
+            onClick={() => {
+              localStorage.setItem("employeeNo", employeeNo);
+              localStorage.setItem("name", name);
+              localStorage.setItem("department", department);
+              setStarted(true);
+            }}
+            disabled={!department.trim() || !name.trim() || employeeNo.length < 8}
+            style={{
+              backgroundColor: !department.trim() || !name.trim() || employeeNo.length < 8 ? "#ccc" : "#4CAF50",
+              color: "white",
+              padding: "8px 16px",
+              border: "none",
+              cursor: !department.trim() || !name.trim() || employeeNo.length < 8 ? "not-allowed" : "pointer"
+            }}
+          >
+            开始测验
+          </button>
 
-          {ADMIN_NAMES.includes(name.trim().toLowerCase()) && (<button onClick={() => setShowHistory(true)}>查看记录</button>)}
+          {isAdmin && (<button onClick={() => setShowHistory(true)}>查看记录</button>)}
 
-          {ADMIN_NAMES.includes(name.trim().toLowerCase()) && employeeNo.length >= 8 && (<button style={{ backgroundColor: "#2196f3", color: "white", padding: "8px 16px", border: "none", cursor: "pointer", marginTop: "10px" }} onClick={() => { localStorage.setItem("employeeNo", employeeNo); localStorage.setItem("name", name); localStorage.setItem("department", department); navigate("/audioPage"); }}>🎧 听语音</button>)}
+          {isAdmin && employeeNo.length >= 8 && (
+            <button
+              style={{ backgroundColor: "#2196f3", color: "white", padding: "8px 16px", border: "none", cursor: "pointer", marginTop: "10px" }}
+              onClick={() => {
+                localStorage.setItem("employeeNo", employeeNo);
+                localStorage.setItem("name", name);
+                localStorage.setItem("department", department);
+                navigate("/audioPage");
+              }}
+            >
+              🎧 听语音
+            </button>
+          )}
         </div>
       </div>
     );
   }
 
+  // ======= SUBMITTED =======
   if (submitted) {
     const percentage = (score / questions.length) * 100;
     const passed = percentage >= PASS_MARK;
@@ -282,18 +448,76 @@ const QuizApp = () => {
 
     return (
       <div className="result-screen">
-        {loading && (<div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}><img src="/loading.gif" alt="Loading..." style={{ width: '80px', height: '80px' }} /></div>)}
+        {loading && (
+          <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+            <img src="/loading.gif" alt="Loading..." style={{ width: '80px', height: '80px' }} />
+          </div>
+        )}
 
-        {passed && (<div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap: '5px' }}><button className="submit-button" onClick={() => setShowCertImage(true)}>🖼️ 查看证书</button><button className="submit-button" onClick={() => { setLoading(true); setTimeout(async () => { try { await generateCertificate(name, score, questions.length, department); } finally { setLoading(false); } }, 0); }}>📄 下载证书</button></div>)}
+        {passed && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap: '5px' }}>
+            <button className="submit-button" onClick={() => setShowCertImage(true)}>🖼️ 查看证书</button>
+            <button
+              className="submit-button"
+              onClick={() => {
+                setLoading(true);
+                setTimeout(async () => {
+                  try { await generateCertificate(name, score, questions.length, department); }
+                  finally { setLoading(false); }
+                }, 0);
+              }}
+            >
+              📄 下载证书
+            </button>
+          </div>
+        )}
 
-        {showCertImage && (<div className="certificate-modal"><div className="certificate-content"><span className="close-button" onClick={() => setShowCertImage(false)}>×</span><div className="certificate-overlay"><img src="/images/certCompleted.jpg" alt="Certificate" className="certificate-image" /><div className="certificate-overlay-text"><p>This is to certify that</p><h2>{name} ({department})</h2><p>has successfully completed the MA Strategy quiz.</p><div style={{ justifyContent: "center", gap: "20px", paddingBottom: "0px" }}><p>Score: {percentage.toFixed(0)}%</p><p>Date: {new Date().toLocaleDateString()}</p></div><p>Bosch Automotive Products (Shenzhen) Co., Ltd.</p></div></div></div></div>)}
+        {showCertImage && (
+          <div className="certificate-modal">
+            <div className="certificate-content">
+              <span className="close-button" onClick={() => setShowCertImage(false)}>×</span>
+              <div className="certificate-overlay">
+                <img src="/images/certCompleted.jpg" alt="Certificate" className="certificate-image" />
+                <div className="certificate-overlay-text">
+                  <p>This is to certify that</p>
+                  <h2>{name} ({department})</h2>
+                  <p>has successfully completed the MA Strategy quiz.</p>
+                  <div style={{ justifyContent: "center", gap: "20px", paddingBottom: "0px" }}>
+                    <p>Score: {percentage.toFixed(0)}%</p>
+                    <p>Date: {new Date().toLocaleDateString()}</p>
+                  </div>
+                  <p>Bosch Automotive Products (Shenzhen) Co., Ltd.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <h2>📊 测验结果</h2>
         <p>你的分数: {score} / {questions.length} ({percentage.toFixed(0)}%)</p>
-        <p style={{ color: passed ? "green" : "red", fontWeight: "bold", fontSize: "1.5rem" }}>{passed ? "🎉 恭喜完成测验！您的努力值得肯定 👏" : "这次分数还差一点点！别灰心～再挑战一次就有机会通过啰！请重新扫码并完成测验，加油！💪"}</p>
+        <p style={{ color: passed ? "green" : "red", fontWeight: "bold", fontSize: "1.5rem" }}>
+          {passed ? "🎉 恭喜完成测验！您的努力值得肯定 👏" : "这次分数还差一点点！别灰心～再挑战一次就有机会通过啰！请重新扫码并完成测验，加油！💪"}
+        </p>
         {insertError && <p style={{ color: "red" }}>❌ Error saving score: {insertError}</p>}
 
-        {wrongAnswers.length > 0 && (<div className="review-section"><h3>🧐 错误答案的复习:</h3><ul>{wrongAnswers.map((q, i) => (<li key={i} style={{ marginBottom: '1rem' }}><strong>Q:</strong> {q.question}<br /><strong>您的答案:</strong> {Array.isArray(answers[questions.indexOf(q)]) ? answers[questions.indexOf(q)].join(", ") : (answers[questions.indexOf(q)] || 'Not Answered')}<br /><strong>正确答案:</strong> {Array.isArray(q.correct) ? q.correct.join(", ") : q.correct}</li>))}</ul></div>)}
+        {wrongAnswers.length > 0 && (
+          <div className="review-section">
+            <h3>🧐 错误答案的复习:</h3>
+            <ul>
+              {wrongAnswers.map((q, i) => (
+                <li key={i} style={{ marginBottom: '1rem' }}>
+                  <strong>Q:</strong> {q.question}<br />
+                  <strong>您的答案:</strong>{" "}
+                  {Array.isArray(answers[questions.indexOf(q)])
+                    ? answers[questions.indexOf(q)].join(", ")
+                    : (answers[questions.indexOf(q)] || 'Not Answered')}
+                  <br />
+                  <strong>正确答案:</strong> {Array.isArray(q.correct) ? q.correct.join(", ") : q.correct}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <button className="submit-button" onClick={() => { setStarted(true); loadShuffledQuestions(); }}>🔁 再挑战</button>
         <button className="submit-button" style={{ backgroundColor: '#dc3545' }} onClick={resetQuiz}>⏹ 结束</button>
@@ -303,25 +527,88 @@ const QuizApp = () => {
 
   if (!questions.length || !questions[currentIndex]) return <div className="quiz-screen"><p>Loading quiz...</p></div>;
 
+  // ======= QUIZ QUESTION VIEW =======
   const currentQuestion = questions[currentIndex];
   const isMultiple = Array.isArray(currentQuestion.correct);
   const selectedAnswers = isMultiple ? (answers[currentIndex] || []) : answers[currentIndex];
+  const currentIsCorrect = isAnswerCorrect(currentQuestion, selectedAnswers);
+
+  const lockOptions = isLockedSingleChoice(currentQuestion, currentIndex);
 
   return (
     <div className="quiz-screen" style={{ background: `url('/images/quizTime.jpg') no-repeat center center / cover`, minHeight: '100vh' }}>
-      <div className="quiz-header"><h2>Question {currentIndex + 1} of {questions.length}</h2><button onClick={resetQuiz}>❌ 停止</button></div>
-      <div className="progress-bar"><div className="progress-fill" style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }} /></div>
-      <div className="quiz-question animate"><p><strong style={{ fontSize: '25px' }}>{currentQuestion.question}</strong></p>
-        {isMultiple && (<p style={{ fontStyle: 'italic', color: 'white', marginBottom: '10px', fontSize: '15px' }}>(选择所有适用的选项)</p>)}
+      <div className="quiz-header">
+        <h2>Question {currentIndex + 1} of {questions.length}</h2>
+        <button onClick={resetQuiz}>❌ 停止</button>
+      </div>
+
+      <div className="progress-bar">
+        <div className="progress-fill" style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }} />
+      </div>
+
+      <div className="quiz-question animate">
+        <p><strong style={{ fontSize: '25px' }}>{currentQuestion.question}</strong></p>
+
+        {isMultiple && (
+          <p style={{ fontStyle: 'italic', color: 'white', marginBottom: '10px', fontSize: '15px' }}>
+            (选择所有适用的选项)
+          </p>
+        )}
+
         {currentQuestion.options.map((opt, idx) => {
           const selected = isMultiple ? selectedAnswers.includes(opt) : selectedAnswers === opt;
-          return (<button key={idx} onClick={() => handleSelect(opt)} className={`option-button ${selected ? "selected" : ""}`} style={{ userSelect: "none" }}>{opt}</button>);
+
+          const showExplainHere =
+            currentIsCorrect &&
+            !!currentQuestion.answer_explain &&
+            explainState &&
+            explainState.qIndex === currentIndex &&
+            explainState.option === opt;
+
+          return (
+            <div className="option-wrap" key={idx}>
+              <button
+                onClick={() => handleSelect(opt)}
+                disabled={lockOptions} // ✅ lock when answer_explain exists (single-choice) and already selected
+                className={`option-button ${selected ? "selected" : ""}`}
+                style={{ userSelect: "none" }}
+              >
+                {opt}
+              </button>
+
+              {showExplainHere && (
+                <div className="answer-explain" key={explainState.ts}>
+                  {currentQuestion.answer_explain}
+                </div>
+              )}
+            </div>
+          );
         })}
       </div>
 
-      {isMultiple && currentIndex < questions.length - 1 && (<button className="submit-button" style={{ marginTop: '15px' }} onClick={() => setCurrentIndex(currentIndex + 1)} disabled={(answers[currentIndex]?.length ?? 0) === 0}>下一页</button>)}
+      {/* Next button (enabled once answered) */}
+      {currentIndex < questions.length - 1 && (
+        <button
+          className="submit-button"
+          style={{ marginTop: '15px' }}
+          onClick={goNext}
+          disabled={isMultiple ? (answers[currentIndex]?.length ?? 0) === 0 : !answers[currentIndex]}
+        >
+          下一页
+        </button>
+      )}
 
-      {(currentIndex === questions.length - 1) && (<button onClick={handleSubmit} className="submit-button" style={{ marginTop: '15px' }} disabled={isMultiple ? (answers[currentIndex]?.length ?? 0) === 0 : !answers[currentIndex]}>提交测验</button>)}
+      {/* Submit on last question */}
+      {currentIndex === questions.length - 1 && (
+        <button
+          onClick={handleSubmit}
+          className="submit-button"
+          style={{ marginTop: '15px' }}
+          disabled={isMultiple ? (answers[currentIndex]?.length ?? 0) === 0 : !answers[currentIndex]}
+        >
+          提交测验
+        </button>
+      )}
     </div>
   );
 };
@@ -330,7 +617,11 @@ const generateCertificate = async (name, score, total, department) => {
   const bgImageUrl = '/images/certCompleted.jpg';
   const fontUrl = '/SimSun.ttf';
 
-  const [bgImageBytes, fontBytes] = await Promise.all([fetch(bgImageUrl).then((res) => res.arrayBuffer()), fetch(fontUrl).then((res) => res.arrayBuffer())]);
+  const [bgImageBytes, fontBytes] = await Promise.all([
+    fetch(bgImageUrl).then((res) => res.arrayBuffer()),
+    fetch(fontUrl).then((res) => res.arrayBuffer())
+  ]);
+
   const pdfDoc = await PDFDocument.create();
   pdfDoc.registerFontkit(fontkit);
 
@@ -343,11 +634,13 @@ const generateCertificate = async (name, score, total, department) => {
   const centerX = width / 2;
   const date = new Date().toLocaleDateString();
   const percentage = (score / total) * 100;
+
   const drawTextWithShadow = (text, x, y, size) => {
     const shadowOffset = 1;
     page.drawText(text, { x: x + shadowOffset, y: y - shadowOffset, size, font: customFont, color: rgb(0.6, 0.6, 0.6) });
     page.drawText(text, { x, y, size, font: customFont, color: rgb(0, 0, 0) });
   };
+
   const textName = name + `(${department})`;
   drawTextWithShadow("This is to certify that", centerX - customFont.widthOfTextAtSize("This is to certify that", 24) / 2, height - 280, 24);
   drawTextWithShadow(textName, centerX - customFont.widthOfTextAtSize(textName, 36) / 2, height - 335, 36);
