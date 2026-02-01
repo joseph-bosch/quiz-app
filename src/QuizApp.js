@@ -16,6 +16,7 @@ const ADMIN_NAMES = ["olarinde joseph", "li dongqin"];
 // ✅ Toggle question count here
 const USE_LIMITED_QUESTIONS = true;   // true = use QUESTION_LIMIT random questions, false = use all questions
 const QUESTION_LIMIT = 10;
+const QUIZ_NAME = "Bosch Shenzhen Carbon quiz";
 
 const QuizApp = () => {
   const navigate = useNavigate();
@@ -222,6 +223,7 @@ const QuizApp = () => {
     const mappedData = dataToExport.map(row => {
       if (showAudioHistory) {
         return {
+          "Quiz Type": row.quiz_name,
           "Employee No": row.emp_num || '',
           "Name": row.user_name || '',
           "Department": row.department,
@@ -232,6 +234,7 @@ const QuizApp = () => {
         };
       }
       return {
+        "Quiz Type": row.quiz_name,
         Name: row.name,
         "Employee No": row.emp_num || '',
         "Department": row.department,
@@ -267,6 +270,7 @@ const QuizApp = () => {
         score: finalScore,
         total: questions.length,
         pass: finalScore / questions.length >= PASS_MARK / 100,
+        quiz_name: QUIZ_NAME,
       }]);
     } catch (err) {
       console.error("Insert score error:", err);
@@ -481,7 +485,7 @@ const QuizApp = () => {
                 <div className="certificate-overlay-text">
                   <p>This is to certify that</p>
                   <h2>{name} ({department})</h2>
-                  <p>has successfully completed the MA Strategy quiz.</p>
+                  <p>has successfully completed the {QUIZ_NAME}.</p>
                   <div style={{ justifyContent: "center", gap: "20px", paddingBottom: "0px" }}>
                     <p>Score: {percentage.toFixed(0)}%</p>
                     <p>Date: {new Date().toLocaleDateString()}</p>
@@ -644,7 +648,7 @@ const generateCertificate = async (name, score, total, department) => {
   const textName = name + `(${department})`;
   drawTextWithShadow("This is to certify that", centerX - customFont.widthOfTextAtSize("This is to certify that", 24) / 2, height - 280, 24);
   drawTextWithShadow(textName, centerX - customFont.widthOfTextAtSize(textName, 36) / 2, height - 335, 36);
-  drawTextWithShadow("has successfully completed the MA Strategy quiz.", centerX - customFont.widthOfTextAtSize("has successfully completed the MA Strategy quiz.", 20) / 2, height - 380, 20);
+  drawTextWithShadow(`has successfully completed the ${QUIZ_NAME}.`, centerX - customFont.widthOfTextAtSize(`has successfully completed the ${QUIZ_NAME}.`, 20) / 2, height - 380, 20);
   drawTextWithShadow(`Score: ${percentage.toFixed(0)}%`, centerX - customFont.widthOfTextAtSize(`Score: ${percentage.toFixed(0)}%`, 18) / 2, height - 460, 18);
   drawTextWithShadow(`Date: ${date}`, centerX - customFont.widthOfTextAtSize(`Date: ${date}`, 18) / 2, height - 420, 18);
   drawTextWithShadow("Bosch Automotive Products (Shenzhen) Co., Ltd.", centerX - customFont.widthOfTextAtSize("Bosch Automotive Products (Shenzhen) Co., Ltd.", 16) / 2, height - 510, 16);
