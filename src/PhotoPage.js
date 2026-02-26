@@ -17,40 +17,120 @@ function loadImage(src) {
   });
 }
 
-/** Returns true for solid light-blue pixels used as the placeholder area. */
-function isLightBlue(r, g, b, a) {
-  if (a !== undefined && a < 200) return false; // skip transparent pixels
-  // Covers shades like #ADD8E6 (173,216,230), #87CEEB (135,206,235),
-  // #B0C4DE (176,196,222), #87CEFA (135,206,250)
-  return (
-    b > 140 &&
-    g > 120 &&
-    r < 220 &&
-    b >= g - 50 &&
-    b > r + 20 &&
-    g > r
-  );
-}
-
-/** Scan imageData for the bounding rectangle of all light-blue pixels. */
-function detectLightBlueRect(imageData, width, height) {
+/**
+ * Detects the photo placeholder by:
+ *   1. Flood-filling from the image borders to mark all "reachable" background pixels.
+ *   2. Finding connected components among enclosed (unreachable) background pixels.
+ *   3. Returning the bounding box of the LARGEST such component.
+ *
+ * This handles templates that have multiple enclosed regions (e.g. a decorative
+ * text box on the left AND a photo frame on the right) — the photo frame is
+ * assumed to be the largest enclosed region.
+ */
+function detectPhotoArea(imageData, width, height) {
   const d = imageData.data;
-  let minX = width, minY = height, maxX = -1, maxY = -1;
 
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const i = (y * width + x) * 4;
-      if (isLightBlue(d[i], d[i + 1], d[i + 2], d[i + 3])) {
+  // Sample background colour from the top-left corner pixel
+  const bgR = d[0], bgG = d[1], bgB = d[2];
+  const TOL = 35; // per-channel tolerance
+
+  function likeBg(pi) {
+    return (
+      Math.abs(d[pi]     - bgR) < TOL &&
+      Math.abs(d[pi + 1] - bgG) < TOL &&
+      Math.abs(d[pi + 2] - bgB) < TOL
+    );
+  }
+
+  // ── Step 1: BFS from all border pixels to mark reachable background ───────
+  const reachable = new Uint8Array(width * height);
+  const q1 = [];
+  let   h1 = 0;
+
+  for (let x = 0; x < width; x++) {
+    for (const y of [0, height - 1]) {
+      const idx = y * width + x;
+      if (!reachable[idx] && likeBg(idx * 4)) { reachable[idx] = 1; q1.push(idx); }
+    }
+  }
+  for (let y = 1; y < height - 1; y++) {
+    for (const x of [0, width - 1]) {
+      const idx = y * width + x;
+      if (!reachable[idx] && likeBg(idx * 4)) { reachable[idx] = 1; q1.push(idx); }
+    }
+  }
+  while (h1 < q1.length) {
+    const idx = q1[h1++];
+    const x = idx % width, y = (idx / width) | 0;
+    if (x > 0)         { const n = idx - 1;     if (!reachable[n] && likeBg(n * 4)) { reachable[n] = 1; q1.push(n); } }
+    if (x < width - 1) { const n = idx + 1;     if (!reachable[n] && likeBg(n * 4)) { reachable[n] = 1; q1.push(n); } }
+    if (y > 0)         { const n = idx - width;  if (!reachable[n] && likeBg(n * 4)) { reachable[n] = 1; q1.push(n); } }
+    if (y < height - 1){ const n = idx + width;  if (!reachable[n] && likeBg(n * 4)) { reachable[n] = 1; q1.push(n); } }
+  }
+
+  // ── Step 2: Find connected components among enclosed bg pixels ────────────
+  //    Return the bounding box of the LARGEST component (= the photo frame).
+  const seen = new Uint8Array(width * height);
+  let best     = null;
+  let bestSize = 0;
+
+  for (let sy = 0; sy < height; sy++) {
+    for (let sx = 0; sx < width; sx++) {
+      const si = sy * width + sx;
+      if (reachable[si] || seen[si] || !likeBg(si * 4)) continue;
+
+      // BFS this component
+      const cq = [si];
+      seen[si] = 1;
+      let ch = 0, size = 0;
+      let minX = sx, maxX = sx, minY = sy, maxY = sy;
+
+      while (ch < cq.length) {
+        const idx = cq[ch++];
+        const x = idx % width, y = (idx / width) | 0;
+        size++;
         if (x < minX) minX = x;
         if (x > maxX) maxX = x;
         if (y < minY) minY = y;
         if (y > maxY) maxY = y;
+
+        if (x > 0)         { const n = idx - 1;     if (!reachable[n] && !seen[n] && likeBg(n * 4)) { seen[n] = 1; cq.push(n); } }
+        if (x < width - 1) { const n = idx + 1;     if (!reachable[n] && !seen[n] && likeBg(n * 4)) { seen[n] = 1; cq.push(n); } }
+        if (y > 0)         { const n = idx - width;  if (!reachable[n] && !seen[n] && likeBg(n * 4)) { seen[n] = 1; cq.push(n); } }
+        if (y < height - 1){ const n = idx + width;  if (!reachable[n] && !seen[n] && likeBg(n * 4)) { seen[n] = 1; cq.push(n); } }
+      }
+
+      if (size > bestSize) {
+        bestSize = size;
+        best = { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 };
       }
     }
   }
 
-  if (maxX === -1) return null;
-  return { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 };
+  // Estimate corner radius and border thickness from pixel data.
+  if (best) {
+    // Corner radius: scan top row inward until we find the first enclosed pixel
+    let cornerRadius = 0;
+    for (let dx = 0; dx < best.width / 2; dx++) {
+      const idx = best.y * width + (best.x + dx);
+      if (!reachable[idx] && likeBg(idx * 4)) { cornerRadius = dx; break; }
+    }
+    best.radius = cornerRadius;
+
+    // Border thickness: scan leftward from the left interior edge (at mid-height)
+    // until we reach the outer background — counts the non-background (border) pixels.
+    const midY = Math.min(best.y + cornerRadius + 5, best.y + ((best.height / 2) | 0));
+    let borderThick = 0;
+    for (let dx = 1; dx <= 60; dx++) {
+      const scanX = best.x - dx;
+      if (scanX < 0) break;
+      if (likeBg((midY * width + scanX) * 4)) break;
+      borderThick = dx;
+    }
+    best.borderThickness = borderThick;
+  }
+
+  return best; // null if no enclosed region found
 }
 
 /** Draw img into (dx, dy, dw, dh) with "cover" crop — fills the box, centred. */
@@ -75,68 +155,121 @@ function drawImageCover(ctx, img, dx, dy, dw, dh) {
   ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
 }
 
+/** Trace a rounded-rectangle path on ctx (works on all browsers). */
+function roundedRectPath(ctx, x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y,     x + w, y + r,     r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x,     y + h, x,       y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x,     y,     x + r,   y,         r);
+  ctx.closePath();
+}
+
 /**
- * Composite userPhotoDataURL into the light-blue area of the template image.
- * Returns a PNG data-URL of the result.
+ * Composite userPhotoDataURL into the photo placeholder area of the template.
+ * Strategy:
+ *   1. Flood-fill from the template border to find the enclosed interior region
+ *      (works for templates where the photo area = same colour as background,
+ *       enclosed by a visible frame/border).
+ *   2. If detection fails, fall back to a generous centred zone.
+ *   3. Draw the full template, clearRect the placeholder area, then
+ *      draw the user photo into that cleared hole.
  */
 async function compositeImages(userPhotoDataURL, templateURL) {
-  // 1. Load the template
   const templateImg = await loadImage(templateURL);
   const W = templateImg.naturalWidth  || templateImg.width;
   const H = templateImg.naturalHeight || templateImg.height;
 
-  // 2. Draw template to an offscreen canvas so we can read pixels
-  const detectCanvas = document.createElement('canvas');
-  detectCanvas.width  = W;
-  detectCanvas.height = H;
-  const detectCtx = detectCanvas.getContext('2d');
-  detectCtx.drawImage(templateImg, 0, 0);
-
-  // 3. Find the light-blue placeholder rectangle
-  const imgData = detectCtx.getImageData(0, 0, W, H);
-  const rect = detectLightBlueRect(imgData, W, H);
-
-  if (!rect || rect.width < 10 || rect.height < 10) {
-    throw new Error(
-      'Could not detect the light-blue photo area in the template. ' +
-      'Make sure template.png has a solid light-blue rectangle.'
-    );
+  // ── 1. Scan template for photo area + background colour ────────────────
+  let rect = null;
+  let bgR = 100, bgG = 0, bgB = 128; // sensible purple fallback
+  try {
+    const scanCanvas = document.createElement('canvas');
+    scanCanvas.width  = W;
+    scanCanvas.height = H;
+    const scanCtx = scanCanvas.getContext('2d');
+    scanCtx.drawImage(templateImg, 0, 0);
+    const imgData = scanCtx.getImageData(0, 0, W, H);
+    bgR = imgData.data[0]; bgG = imgData.data[1]; bgB = imgData.data[2];
+    rect = detectPhotoArea(imgData, W, H);
+  } catch (e) {
+    console.warn('Template pixel scan failed:', e.message);
   }
 
-  // 4. Build a "mask" version of the template: light-blue pixels → transparent
-  const maskCanvas = document.createElement('canvas');
-  maskCanvas.width  = W;
-  maskCanvas.height = H;
-  const maskCtx = maskCanvas.getContext('2d');
-  maskCtx.drawImage(templateImg, 0, 0);
-
-  const maskData = maskCtx.getImageData(0, 0, W, H);
-  const md = maskData.data;
-  for (let i = 0; i < md.length; i += 4) {
-    if (isLightBlue(md[i], md[i + 1], md[i + 2], md[i + 3])) {
-      md[i + 3] = 0; // make transparent
-    }
+  // ── 2. Fallback: centred 76 % of the template ──────────────────────────
+  if (!rect || rect.width < 20 || rect.height < 20) {
+    console.warn('Photo area not detected — using centre fallback.');
+    const pad = 0.12;
+    rect = {
+      x: Math.round(W * pad), y: Math.round(H * pad),
+      width: Math.round(W * (1 - 2 * pad)), height: Math.round(H * (1 - 2 * pad)),
+      radius: 0, borderThickness: 0,
+    };
   }
-  maskCtx.putImageData(maskData, 0, 0);
 
-  // 5. Composite onto output canvas:
-  //    a) Draw user photo (cover-cropped) into the detected rect
-  //    b) Draw the masked template on top  → photo shows through the hole
+  // ── 3. Composite ────────────────────────────────────────────────────────
+  const userImg = await loadImage(userPhotoDataURL);
+
   const outCanvas = document.createElement('canvas');
   outCanvas.width  = W;
   outCanvas.height = H;
   const outCtx = outCanvas.getContext('2d');
 
-  const userImg = await loadImage(userPhotoDataURL);
+  // Expand the punch area to cover the white border ring
+  const baseRadius = rect.radius || 0;
+  const border     = (rect.borderThickness || 0) + 2; // +2 px safety margin
+  const px = Math.max(0, rect.x - border);
+  const py = Math.max(0, rect.y - border);
+  const pw = Math.min(W - px, rect.width  + border * 2);
+  const ph = Math.min(H - py, rect.height + border * 2);
+  const pr = Math.min(baseRadius + border, pw / 2, ph / 2);
 
+  // (a) Draw the full template
+  outCtx.drawImage(templateImg, 0, 0);
+
+  // (b) Punch a rounded hole (includes the white border) using destination-out
   outCtx.save();
-  outCtx.beginPath();
-  outCtx.rect(rect.x, rect.y, rect.width, rect.height);
-  outCtx.clip();
-  drawImageCover(outCtx, userImg, rect.x, rect.y, rect.width, rect.height);
+  outCtx.globalCompositeOperation = 'destination-out';
+  roundedRectPath(outCtx, px, py, pw, ph, pr);
+  outCtx.fill();
   outCtx.restore();
 
-  outCtx.drawImage(maskCanvas, 0, 0);
+  // (c) Draw user photo *behind* the template — fills the transparent rounded hole
+  outCtx.save();
+  outCtx.globalCompositeOperation = 'destination-over';
+  drawImageCover(outCtx, userImg, px, py, pw, ph);
+  outCtx.restore();
+
+  // (d) Edge fade — 4 linear gradients blend the photo edges into the bg colour
+  const fadeSize = Math.min(pw, ph) * 0.18;
+  const bg0 = `rgba(${bgR},${bgG},${bgB},0)`;
+  const bg1 = `rgba(${bgR},${bgG},${bgB},0.92)`;
+  outCtx.save();
+  roundedRectPath(outCtx, px, py, pw, ph, pr);
+  outCtx.clip();
+  let g;
+  g = outCtx.createLinearGradient(0, py, 0, py + fadeSize);
+  g.addColorStop(0, bg1); g.addColorStop(1, bg0);
+  outCtx.fillStyle = g; outCtx.fillRect(px, py, pw, fadeSize);
+
+  g = outCtx.createLinearGradient(0, py + ph - fadeSize, 0, py + ph);
+  g.addColorStop(0, bg0); g.addColorStop(1, bg1);
+  outCtx.fillStyle = g; outCtx.fillRect(px, py + ph - fadeSize, pw, fadeSize);
+
+  g = outCtx.createLinearGradient(px, 0, px + fadeSize, 0);
+  g.addColorStop(0, bg1); g.addColorStop(1, bg0);
+  outCtx.fillStyle = g; outCtx.fillRect(px, py, fadeSize, ph);
+
+  g = outCtx.createLinearGradient(px + pw - fadeSize, 0, px + pw, 0);
+  g.addColorStop(0, bg0); g.addColorStop(1, bg1);
+  outCtx.fillStyle = g; outCtx.fillRect(px + pw - fadeSize, py, fadeSize, ph);
+  outCtx.restore();
 
   return outCanvas.toDataURL('image/png');
 }

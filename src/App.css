@@ -1,11 +1,41 @@
 /* Updated App.css */
 
+/* ── Welcome screen layout (replaces quiz-screen for the landing page) ── */
+.welcome-screen {
+  /* Fill the real visible viewport on every mobile browser */
+  min-height: 100vh;
+  min-height: -webkit-fill-available; /* iOS Safari fallback */
+  min-height: 100dvh;                 /* modern Android/iOS Chrome */
+  display: flex;
+  flex-direction: column;
+  /* Background lives here — keeps JS/JSX free of quoted URL strings */
+  background-image: url(../public/images/quiz.png);
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+}
+
+/* Top bar holds the camera button, always at the top */
+.welcome-top-bar {
+  flex-shrink: 0;
+  padding: 18px 0 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Body fills remaining height and centres the content card */
+.welcome-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px 20px;
+  overflow-y: auto; /* scroll if card is taller than viewport in landscape */
+}
+
 /* Camera / Photo trigger button on welcome screen */
 .photo-trigger-btn {
-  position: absolute;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
   width: 62px;
   height: 62px;
   border-radius: 50%;
@@ -19,6 +49,7 @@
   font-size: 28px;
   line-height: 1;
   transition: transform 0.15s, box-shadow 0.15s;
+  flex-shrink: 0;
 }
 .photo-trigger-btn:hover {
   transform: scale(1.08);
