@@ -795,6 +795,7 @@ import React from "react";
 import { HashRouter as Router, Route, Routes } from "react-router-dom";
 import QuizApp from "./QuizApp";
 import VoicePage from "./VoicePage";
+import PhotoPage from "./PhotoPage";
 
 function App() {
   return (
@@ -803,6 +804,7 @@ function App() {
         <Route path="/" element={<QuizApp />} />
         <Route path="/audioPage" element={<VoicePageWrapper />} />
         <Route path="/audioPage/:audioName" element={<VoicePageWrapper />} />
+        <Route path="/photoPage" element={<PhotoPage />} />
       </Routes>
     </Router>
   );

@@ -356,13 +356,24 @@ const QuizApp = () => {
 
   // ======= WELCOME =======
   if (!welcomeComplete) {
+    const welcomeBg = { background: "url('/images/quiz.png') no-repeat center center / cover", minHeight: '100vh', position: 'relative' };
     return (
-      <div className="quiz-screen" style={{ background: `url('/images/quiz.png') no-repeat center center / cover`, minHeight: '100vh' }}>
+      <div className="quiz-screen" style={welcomeBg}>
         <div className="start-content" style={{ color: 'black' }}>
           <h1>Hi👋，欢迎来到测验时间！</h1>
           <p>恭喜您完成培训课程！接下来的测验是帮助您复习刚才的重点，也是获得证书的最后一步啦！<br />• 测验题数：{USE_LIMITED_QUESTIONS ? QUESTION_LIMIT : "全部"} 题<br />• 轻松作答就好～<br />别紧张，放轻松，您一定可以顺利完成！<br />准备好了吗？Let’s go 🚀🚀🚀</p>
           <button onClick={() => setWelcomeComplete(true)}>Start</button>
         </div>
+
+        {/* Photo / Camera button */}
+        <button
+          className="photo-trigger-btn"
+          onClick={() => navigate('/photoPage')}
+          title="Take a Photo"
+          aria-label="Take a Photo"
+        >
+          📷
+        </button>
       </div>
     );
   }
