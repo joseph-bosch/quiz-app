@@ -68,7 +68,7 @@ function detectPhotoArea(imageData, width, height) {
     if (y < height - 1){ const n = idx + width;  if (!reachable[n] && likeBg(n * 4)) { reachable[n] = 1; q1.push(n); } }
   }
 
-  // ── Step 2: Find connected components among enclosed bg pixels ────────────
+  // ── Step 2a: Find connected components among enclosed bg pixels ───────────
   //    Return the bounding box of the LARGEST component (= the photo frame).
   const seen = new Uint8Array(width * height);
   let best     = null;
@@ -107,8 +107,106 @@ function detectPhotoArea(imageData, width, height) {
     }
   }
 
-  // Estimate corner radius and border thickness from pixel data.
-  if (best) {
+  // ── Step 2b: Fallback — find the photo frame by detecting the largest region
+  //    enclosed by a white/light-coloured border.
+  //    Strategy: flood-fill from all image edges treating bright pixels (the
+  //    white frame border) as impassable walls.  Anything the fill can't reach
+  //    is completely surrounded by those walls — i.e. it IS the photo interior.
+  if (!best || bestSize < width * height * 0.06) {
+    seen.fill(0);
+    bestSize = 0;
+    best = null;
+
+    // A pixel is a "wall" if its average brightness is > 150 (sum > 450).
+    // This catches the frame border (191,232,255 → sum 678) AND classic white,
+    // while ignoring the dark-blue background (0,66,112 → sum 178) and the
+    // medium-blue right panel (0,109,178 → sum 287).
+    const isWall = (pi) => d[pi] + d[pi + 1] + d[pi + 2] > 450;
+
+    // Flood-fill from every border pixel that is NOT a wall.
+    const reach2 = new Uint8Array(width * height);
+    const q2 = [];
+    let h2 = 0;
+    for (let x = 0; x < width; x++) {
+      const t = x, b = (height - 1) * width + x;
+      if (!reach2[t] && !isWall(t * 4)) { reach2[t] = 1; q2.push(t); }
+      if (!reach2[b] && !isWall(b * 4)) { reach2[b] = 1; q2.push(b); }
+    }
+    for (let y = 1; y < height - 1; y++) {
+      const l = y * width, r = y * width + width - 1;
+      if (!reach2[l] && !isWall(l * 4)) { reach2[l] = 1; q2.push(l); }
+      if (!reach2[r] && !isWall(r * 4)) { reach2[r] = 1; q2.push(r); }
+    }
+    while (h2 < q2.length) {
+      const idx = q2[h2++];
+      const x = idx % width, y = (idx / width) | 0;
+      if (x > 0)         { const n=idx-1;     if (!reach2[n] && !isWall(n*4)) { reach2[n]=1; q2.push(n); } }
+      if (x < width-1)   { const n=idx+1;     if (!reach2[n] && !isWall(n*4)) { reach2[n]=1; q2.push(n); } }
+      if (y > 0)         { const n=idx-width; if (!reach2[n] && !isWall(n*4)) { reach2[n]=1; q2.push(n); } }
+      if (y < height-1)  { const n=idx+width; if (!reach2[n] && !isWall(n*4)) { reach2[n]=1; q2.push(n); } }
+    }
+
+    // Find the LARGEST connected component that is: not reachable and not a wall.
+    for (let sy = 0; sy < height; sy++) {
+      for (let sx = 0; sx < width; sx++) {
+        const si = sy * width + sx;
+        if (reach2[si] || seen[si] || isWall(si * 4)) continue;
+
+        const cq = [si];
+        seen[si] = 1;
+        let ch = 0, size = 0;
+        let minX = sx, maxX = sx, minY = sy, maxY = sy;
+
+        while (ch < cq.length) {
+          const idx = cq[ch++];
+          const x = idx % width, y = (idx / width) | 0;
+          size++;
+          if (x < minX) minX = x; if (x > maxX) maxX = x;
+          if (y < minY) minY = y; if (y > maxY) maxY = y;
+
+          if (x > 0)         { const n=idx-1;     if (!reach2[n] && !seen[n] && !isWall(n*4)) { seen[n]=1; cq.push(n); } }
+          if (x < width-1)   { const n=idx+1;     if (!reach2[n] && !seen[n] && !isWall(n*4)) { seen[n]=1; cq.push(n); } }
+          if (y > 0)         { const n=idx-width; if (!reach2[n] && !seen[n] && !isWall(n*4)) { seen[n]=1; cq.push(n); } }
+          if (y < height-1)  { const n=idx+width; if (!reach2[n] && !seen[n] && !isWall(n*4)) { seen[n]=1; cq.push(n); } }
+        }
+
+        if (size > bestSize) {
+          bestSize = size;
+          best = { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 };
+        }
+      }
+    }
+
+    // Border thickness for step 2b: count wall pixels to the left of the
+    // interior edge — stop as soon as we hit a non-wall (exterior) pixel.
+    // We do this here while isWall is still in scope.
+    if (best) {
+      const midY2 = best.y + (best.height >> 1);
+      let bt = 0;
+      for (let dx = 1; dx <= 30; dx++) {
+        const scanX = best.x - dx;
+        if (scanX < 0) break;
+        const sp = (midY2 * width + scanX) * 4;
+        if (d[sp] + d[sp + 1] + d[sp + 2] <= 450) break; // hit non-wall (exterior)
+        bt = dx;
+      }
+      best.borderThickness = bt;
+
+      // Detect corner radius: at y=best.y (topmost interior row) scan rightward
+      // from best.x.  Pixels at the rounded corners are wall pixels; the first
+      // non-wall non-reach2 pixel is where the interior actually starts.
+      // That offset equals the corner radius of the frame.
+      let r2 = 0;
+      for (let dx = 0; dx < Math.min(best.width >> 1, 80); dx++) {
+        const idx = best.y * width + (best.x + dx);
+        if (!reach2[idx] && !isWall(idx * 4)) { r2 = dx; break; }
+      }
+      best.radius = r2;
+    }
+  }
+
+  // Estimate corner radius and border thickness from pixel data (step 2a path).
+  if (best && best.borderThickness === undefined) {
     // Corner radius: scan top row inward until we find the first enclosed pixel
     let cornerRadius = 0;
     for (let dx = 0; dx < best.width / 2; dx++) {
@@ -376,11 +474,31 @@ const PhotoPage = () => {
     }
   };
 
-  const savePicture = () => {
+  const savePicture = async () => {
     if (!resultImage) return;
+    const filename = `photo_${Date.now()}.png`;
+
+    // Prefer Web Share API — on iOS Safari this shows a share sheet that
+    // includes "Save Image", writing the photo directly to the Photos library.
+    // On Android Chrome it also offers "Save to Photos" or similar.
+    try {
+      const res  = await fetch(resultImage);
+      const blob = await res.blob();
+      const file = new File([blob], filename, { type: 'image/png' });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'My Photo' });
+        return;
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') return; // user dismissed the share sheet
+      // share failed — fall through to the download link
+    }
+
+    // Fallback: classic <a download> (works on desktop; saves to Files on iOS)
     const a = document.createElement('a');
     a.href     = resultImage;
-    a.download = `photo_${Date.now()}.png`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
