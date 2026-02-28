@@ -232,14 +232,11 @@ function detectPhotoArea(imageData, width, height) {
 }
 
 /**
- * Draw img into (dx, dy, dw, dh).
+ * Draw img into (dx, dy, dw, dh) with a cover crop — fills the frame fully.
  *
- * Landscape photos (imgAspect ≥ boxAspect): centre cover-crop — fills the
- * frame, crops left/right symmetrically, nothing lost top or bottom.
- *
- * Portrait photos (imgAspect < boxAspect): zoom-out contain — the full photo
- * is scaled to fit the frame HEIGHT and centred.  Any side gaps are filled
- * with the template background color by the caller (compositeImages step c).
+ * Landscape (imgAspect ≥ boxAspect): crop left/right symmetrically.
+ * Portrait  (imgAspect < boxAspect): crop is biased toward the TOP (30 % from
+ * top, 70 % from bottom) so the face/head stays in frame for selfies.
  */
 function drawImageContain(ctx, img, dx, dy, dw, dh) {
   const iw = img.naturalWidth  || img.width;
@@ -247,16 +244,17 @@ function drawImageContain(ctx, img, dx, dy, dw, dh) {
   const imgAspect = iw / ih;
   const boxAspect = dw / dh;
 
+  let sx, sy, sw, sh;
   if (imgAspect >= boxAspect) {
-    // Landscape: centre cover-crop (no distortion, minimal crop)
-    const sh = ih, sw = ih * boxAspect, sx = (iw - sw) / 2;
-    ctx.drawImage(img, sx, 0, sw, sh, dx, dy, dw, dh);
+    // Landscape: cover-crop left/right, keep full height
+    sh = ih; sw = sh * boxAspect; sx = (iw - sw) / 2; sy = 0;
   } else {
-    // Portrait: contain by height — full photo visible, centred horizontally.
-    // The caller fills the left/right gaps with the template background color.
-    const fw = dh * imgAspect; // display width at contain scale
-    ctx.drawImage(img, dx + (dw - fw) / 2, dy, fw, dh);
+    // Portrait: cover-crop top/bottom, bias toward top to preserve the face
+    sw = iw; sh = sw / boxAspect;
+    sy = (ih - sh) * 0.3; // 30 % from top, 70 % from bottom
+    sx = 0;
   }
+  ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
 }
 
 /** Trace a rounded-rectangle path on ctx (works on all browsers). */
@@ -347,17 +345,7 @@ async function compositeImages(userPhotoDataURL, templateURL) {
   // (c) Draw user photo *behind* the template — fills the transparent rounded hole
   outCtx.save();
   outCtx.globalCompositeOperation = 'destination-over';
-
-  // Draw the photo first (goes directly behind the template).
   drawImageContain(outCtx, userImg, px, py, pw, ph);
-
-  // Fill any remaining gaps (portrait side bars) with the template background
-  // color. With destination-over this sits behind the photo, so it only shows
-  // in areas the photo does not cover.
-  outCtx.fillStyle = `rgb(${bgR},${bgG},${bgB})`;
-  roundedRectPath(outCtx, px, py, pw, ph, pr);
-  outCtx.fill();
-
   outCtx.restore();
 
   // (d) Edge fade — 4 linear gradients blend the photo edges into the bg color
