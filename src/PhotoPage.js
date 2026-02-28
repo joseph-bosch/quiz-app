@@ -330,7 +330,11 @@ async function compositeImages(userPhotoDataURL, templateURL) {
   const py = Math.max(0, rect.y - border);
   const pw = Math.min(W - px, rect.width  + border * 2);
   const ph = Math.min(H - py, rect.height + border * 2);
-  const pr = Math.min(baseRadius + border, pw / 2, ph / 2);
+  // Ensure a visually meaningful corner radius even if detection returns a small value.
+  const pr = Math.max(
+    Math.min(baseRadius + border, pw / 2, ph / 2),
+    Math.min(pw, ph) * 0.1   // at least 10 % of the shorter frame dimension
+  );
 
   // (a) Draw the full template
   outCtx.drawImage(templateImg, 0, 0);
@@ -348,30 +352,32 @@ async function compositeImages(userPhotoDataURL, templateURL) {
   drawImageContain(outCtx, userImg, px, py, pw, ph);
   outCtx.restore();
 
-  // (d) Edge fade — 4 linear gradients blend the photo edges into the bg color
-  const fadeSize = Math.min(pw, ph) * 0.18;
+  // (d) Outward edge fade — gradients drawn OUTSIDE the hole boundary so the
+  // photo stays sharp inside the frame while the frame edge softly dissolves
+  // into the template background.  Fade zone is 6 % of the shorter dimension.
+  const fadeSize = Math.min(pw, ph) * 0.06;
   const bg0 = `rgba(${bgR},${bgG},${bgB},0)`;
-  const bg1 = `rgba(${bgR},${bgG},${bgB},0.92)`;
-  outCtx.save();
-  roundedRectPath(outCtx, px, py, pw, ph, pr);
-  outCtx.clip();
+  const bg1 = `rgba(${bgR},${bgG},${bgB},0.82)`;
   let g;
-  g = outCtx.createLinearGradient(0, py, 0, py + fadeSize);
-  g.addColorStop(0, bg1); g.addColorStop(1, bg0);
-  outCtx.fillStyle = g; outCtx.fillRect(px, py, pw, fadeSize);
-
-  g = outCtx.createLinearGradient(0, py + ph - fadeSize, 0, py + ph);
+  // Top — gradient runs from hole top edge upward (outward)
+  g = outCtx.createLinearGradient(0, py - fadeSize, 0, py);
   g.addColorStop(0, bg0); g.addColorStop(1, bg1);
-  outCtx.fillStyle = g; outCtx.fillRect(px, py + ph - fadeSize, pw, fadeSize);
+  outCtx.fillStyle = g; outCtx.fillRect(px, py - fadeSize, pw, fadeSize);
 
-  g = outCtx.createLinearGradient(px, 0, px + fadeSize, 0);
+  // Bottom — gradient runs from hole bottom edge downward (outward)
+  g = outCtx.createLinearGradient(0, py + ph, 0, py + ph + fadeSize);
   g.addColorStop(0, bg1); g.addColorStop(1, bg0);
-  outCtx.fillStyle = g; outCtx.fillRect(px, py, fadeSize, ph);
+  outCtx.fillStyle = g; outCtx.fillRect(px, py + ph, pw, fadeSize);
 
-  g = outCtx.createLinearGradient(px + pw - fadeSize, 0, px + pw, 0);
+  // Left — gradient runs from hole left edge leftward (outward)
+  g = outCtx.createLinearGradient(px - fadeSize, 0, px, 0);
   g.addColorStop(0, bg0); g.addColorStop(1, bg1);
-  outCtx.fillStyle = g; outCtx.fillRect(px + pw - fadeSize, py, fadeSize, ph);
-  outCtx.restore();
+  outCtx.fillStyle = g; outCtx.fillRect(px - fadeSize, py, fadeSize, ph);
+
+  // Right — gradient runs from hole right edge rightward (outward)
+  g = outCtx.createLinearGradient(px + pw, 0, px + pw + fadeSize, 0);
+  g.addColorStop(0, bg1); g.addColorStop(1, bg0);
+  outCtx.fillStyle = g; outCtx.fillRect(px + pw, py, fadeSize, ph);
 
   return outCanvas.toDataURL('image/png');
 }
