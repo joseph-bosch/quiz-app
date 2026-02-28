@@ -231,20 +231,36 @@ function detectPhotoArea(imageData, width, height) {
   return best; // null if no enclosed region found
 }
 
-/** Draw img into (dx, dy, dw, dh) with cover crop — fills the frame, centred. */
+/**
+ * Draw img into (dx, dy, dw, dh).
+ *
+ * Strategy:
+ *   • Similar aspect ratios (ratio 0.75–1.33): cover crop — fills the frame
+ *     with a small, barely-noticeable centre-crop.
+ *   • Very different aspect ratios (portrait selfie into landscape frame or
+ *     vice-versa): stretch-to-fill — the entire photo is shown without any
+ *     cropping; the image is scaled to fit both dimensions exactly, which
+ *     introduces a controlled amount of distortion rather than hiding large
+ *     portions of the subject.
+ */
 function drawImageContain(ctx, img, dx, dy, dw, dh) {
   const iw = img.naturalWidth  || img.width;
   const ih = img.naturalHeight || img.height;
-  const imgAspect = iw / ih;
-  const boxAspect = dw / dh;
+  const ratio = (iw / ih) / (dw / dh); // imgAspect / boxAspect
 
-  let sx, sy, sw, sh;
-  if (imgAspect > boxAspect) {
-    sh = ih; sw = sh * boxAspect; sx = (iw - sw) / 2; sy = 0;
+  if (ratio >= 0.75 && ratio <= 1.33) {
+    // Aspect ratios are close — cover crop (minimal crop, no distortion).
+    let sx, sy, sw, sh;
+    if (ratio > 1) {
+      sh = ih; sw = sh * (dw / dh); sx = (iw - sw) / 2; sy = 0;
+    } else {
+      sw = iw; sh = sw / (dw / dh); sx = 0; sy = (ih - sh) / 2;
+    }
+    ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
   } else {
-    sw = iw; sh = sw / boxAspect; sx = 0; sy = (ih - sh) / 2;
+    // Large aspect difference — stretch to fill so the whole photo is visible.
+    ctx.drawImage(img, dx, dy, dw, dh);
   }
-  ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
 }
 
 /** Trace a rounded-rectangle path on ctx (works on all browsers). */
