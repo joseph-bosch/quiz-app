@@ -30,7 +30,7 @@ function loadImage(src) {
 function detectPhotoArea(imageData, width, height) {
   const d = imageData.data;
 
-  // Sample background colour from the top-left corner pixel
+  // Sample background color from the top-left corner pixel
   const bgR = d[0], bgG = d[1], bgB = d[2];
   const TOL = 35; // per-channel tolerance
 
@@ -108,7 +108,7 @@ function detectPhotoArea(imageData, width, height) {
   }
 
   // ── Step 2b: Fallback — find the photo frame by detecting the largest region
-  //    enclosed by a white/light-coloured border.
+  //    enclosed by a white/light-colored border.
   //    Strategy: flood-fill from all image edges treating bright pixels (the
   //    white frame border) as impassable walls.  Anything the fill can't reach
   //    is completely surrounded by those walls — i.e. it IS the photo interior.
@@ -232,14 +232,14 @@ function detectPhotoArea(imageData, width, height) {
 }
 
 /**
- * Draw img into (dx, dy, dw, dh) with a cover crop that fills the frame.
+ * Draw img into (dx, dy, dw, dh).
  *
- * For landscape photos (imgAspect ≥ boxAspect): crop is centred left-right,
- * nothing is lost top or bottom — same behavior as before.
+ * Landscape photos (imgAspect ≥ boxAspect): centre cover-crop — fills the
+ * frame, crops left/right symmetrically, nothing lost top or bottom.
  *
- * For portrait photos (imgAspect < boxAspect, e.g. a selfie into a landscape/
- * square frame): the crop is anchored to the TOP of the photo.  Only the
- * bottom is ever clipped, so the face and head are always preserved.
+ * Portrait photos (imgAspect < boxAspect): zoom-out contain — the full photo
+ * is scaled to fit the frame HEIGHT and centred.  Any side gaps are filled
+ * with the template background color by the caller (compositeImages step c).
  */
 function drawImageContain(ctx, img, dx, dy, dw, dh) {
   const iw = img.naturalWidth  || img.width;
@@ -247,16 +247,16 @@ function drawImageContain(ctx, img, dx, dy, dw, dh) {
   const imgAspect = iw / ih;
   const boxAspect = dw / dh;
 
-  let sx, sy, sw, sh;
-  if (imgAspect > boxAspect) {
-    // Photo wider than frame → crop left & right symmetrically, keep full height
-    sh = ih; sw = sh * boxAspect; sx = (iw - sw) / 2; sy = 0;
+  if (imgAspect >= boxAspect) {
+    // Landscape: centre cover-crop (no distortion, minimal crop)
+    const sh = ih, sw = ih * boxAspect, sx = (iw - sw) / 2;
+    ctx.drawImage(img, sx, 0, sw, sh, dx, dy, dw, dh);
   } else {
-    // Photo taller than frame (portrait selfie) → crop from the bottom only,
-    // anchor to the top so the face/head is always in frame.
-    sw = iw; sh = sw / boxAspect; sx = 0; sy = 0;
+    // Portrait: contain by height — full photo visible, centred horizontally.
+    // The caller fills the left/right gaps with the template background color.
+    const fw = dh * imgAspect; // display width at contain scale
+    ctx.drawImage(img, dx + (dw - fw) / 2, dy, fw, dh);
   }
-  ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
 }
 
 /** Trace a rounded-rectangle path on ctx (works on all browsers). */
@@ -279,7 +279,7 @@ function roundedRectPath(ctx, x, y, w, h, r) {
  * Composite userPhotoDataURL into the photo placeholder area of the template.
  * Strategy:
  *   1. Flood-fill from the template border to find the enclosed interior region
- *      (works for templates where the photo area = same colour as background,
+ *      (works for templates where the photo area = same color as background,
  *       enclosed by a visible frame/border).
  *   2. If detection fails, fall back to a generous centred zone.
  *   3. Draw the full template, clearRect the placeholder area, then
@@ -290,7 +290,7 @@ async function compositeImages(userPhotoDataURL, templateURL) {
   const W = templateImg.naturalWidth  || templateImg.width;
   const H = templateImg.naturalHeight || templateImg.height;
 
-  // ── 1. Scan template for photo area + background colour ────────────────
+  // ── 1. Scan template for photo area + background color ────────────────
   let rect = null;
   let bgR = 100, bgG = 0, bgB = 128; // sensible purple fallback
   try {
@@ -347,10 +347,20 @@ async function compositeImages(userPhotoDataURL, templateURL) {
   // (c) Draw user photo *behind* the template — fills the transparent rounded hole
   outCtx.save();
   outCtx.globalCompositeOperation = 'destination-over';
+
+  // Draw the photo first (goes directly behind the template).
   drawImageContain(outCtx, userImg, px, py, pw, ph);
+
+  // Fill any remaining gaps (portrait side bars) with the template background
+  // color. With destination-over this sits behind the photo, so it only shows
+  // in areas the photo does not cover.
+  outCtx.fillStyle = `rgb(${bgR},${bgG},${bgB})`;
+  roundedRectPath(outCtx, px, py, pw, ph, pr);
+  outCtx.fill();
+
   outCtx.restore();
 
-  // (d) Edge fade — 4 linear gradients blend the photo edges into the bg colour
+  // (d) Edge fade — 4 linear gradients blend the photo edges into the bg color
   const fadeSize = Math.min(pw, ph) * 0.18;
   const bg0 = `rgba(${bgR},${bgG},${bgB},0)`;
   const bg1 = `rgba(${bgR},${bgG},${bgB},0.92)`;
