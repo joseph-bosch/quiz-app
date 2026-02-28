@@ -232,35 +232,31 @@ function detectPhotoArea(imageData, width, height) {
 }
 
 /**
- * Draw img into (dx, dy, dw, dh).
+ * Draw img into (dx, dy, dw, dh) with a cover crop that fills the frame.
  *
- * Strategy:
- *   • Similar aspect ratios (ratio 0.75–1.33): cover crop — fills the frame
- *     with a small, barely-noticeable centre-crop.
- *   • Very different aspect ratios (portrait selfie into landscape frame or
- *     vice-versa): stretch-to-fill — the entire photo is shown without any
- *     cropping; the image is scaled to fit both dimensions exactly, which
- *     introduces a controlled amount of distortion rather than hiding large
- *     portions of the subject.
+ * For landscape photos (imgAspect ≥ boxAspect): crop is centred left-right,
+ * nothing is lost top or bottom — same behavior as before.
+ *
+ * For portrait photos (imgAspect < boxAspect, e.g. a selfie into a landscape/
+ * square frame): the crop is anchored to the TOP of the photo.  Only the
+ * bottom is ever clipped, so the face and head are always preserved.
  */
 function drawImageContain(ctx, img, dx, dy, dw, dh) {
   const iw = img.naturalWidth  || img.width;
   const ih = img.naturalHeight || img.height;
-  const ratio = (iw / ih) / (dw / dh); // imgAspect / boxAspect
+  const imgAspect = iw / ih;
+  const boxAspect = dw / dh;
 
-  if (ratio >= 0.75 && ratio <= 1.33) {
-    // Aspect ratios are close — cover crop (minimal crop, no distortion).
-    let sx, sy, sw, sh;
-    if (ratio > 1) {
-      sh = ih; sw = sh * (dw / dh); sx = (iw - sw) / 2; sy = 0;
-    } else {
-      sw = iw; sh = sw / (dw / dh); sx = 0; sy = (ih - sh) / 2;
-    }
-    ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+  let sx, sy, sw, sh;
+  if (imgAspect > boxAspect) {
+    // Photo wider than frame → crop left & right symmetrically, keep full height
+    sh = ih; sw = sh * boxAspect; sx = (iw - sw) / 2; sy = 0;
   } else {
-    // Large aspect difference — stretch to fill so the whole photo is visible.
-    ctx.drawImage(img, dx, dy, dw, dh);
+    // Photo taller than frame (portrait selfie) → crop from the bottom only,
+    // anchor to the top so the face/head is always in frame.
+    sw = iw; sh = sw / boxAspect; sx = 0; sy = 0;
   }
+  ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
 }
 
 /** Trace a rounded-rectangle path on ctx (works on all browsers). */
