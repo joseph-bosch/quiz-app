@@ -231,26 +231,95 @@ function detectPhotoArea(imageData, width, height) {
   return best; // null if no enclosed region found
 }
 
-/** Draw img into (dx, dy, dw, dh) with "cover" crop — fills the box, centred. */
-function drawImageCover(ctx, img, dx, dy, dw, dh) {
+/**
+ * Draw img into (dx, dy, dw, dh).
+ *
+ * • When the photo and frame aspects are similar (ratio 0.65–1.6) → cover fill:
+ *   the photo fills the frame with a small centre-crop, no bars visible.
+ *
+ * • When the photo is much more portrait than the frame (e.g. selfie into a
+ *   landscape template) → contain + blurred background:
+ *   - Full photo shown without any top/bottom crop.
+ *   - Bars beside the photo are filled with a blurred copy of the photo.
+ *   - The sharp photo's edges fade smoothly into the blurred background via a
+ *     gradient alpha mask, so there is no hard seam.
+ */
+function drawImageContain(ctx, img, dx, dy, dw, dh) {
   const iw = img.naturalWidth  || img.width;
   const ih = img.naturalHeight || img.height;
   const imgAspect = iw / ih;
   const boxAspect = dw / dh;
 
-  let sx, sy, sw, sh;
-  if (imgAspect > boxAspect) {
-    sh = ih;
-    sw = sh * boxAspect;
-    sx = (iw - sw) / 2;
-    sy = 0;
-  } else {
-    sw = iw;
-    sh = sw / boxAspect;
-    sx = 0;
-    sy = (ih - sh) / 2;
+  // ── Cover mode for similar aspect ratios ──────────────────────────────────
+  const ratio = imgAspect / boxAspect;
+  if (ratio >= 0.65 && ratio <= 1.6) {
+    let sx, sy, sw, sh;
+    if (imgAspect > boxAspect) {
+      sh = ih; sw = sh * boxAspect; sx = (iw - sw) / 2; sy = 0;
+    } else {
+      sw = iw; sh = sw / boxAspect; sx = 0; sy = (ih - sh) / 2;
+    }
+    ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+    return;
   }
-  ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+
+  // ── Contain mode: blurred background + sharp photo with faded edges ───────
+  // Compose everything on an offscreen canvas so layers stack normally
+  // (blurred bg → sharp photo on top), then draw the result once with
+  // whatever composite op (destination-over) the caller has set.
+  const offCanvas = document.createElement('canvas');
+  offCanvas.width  = dw;
+  offCanvas.height = dh;
+  const off = offCanvas.getContext('2d');
+
+  // 1. Blurred background fill (oversize slightly to hide blur edge artifacts)
+  off.filter = 'blur(22px)';
+  off.drawImage(img, -25, -25, dw + 50, dh + 50);
+  off.filter = 'none';
+
+  // 2. Contain-fit position of the sharp photo
+  let fw, fh, fx, fy;
+  if (imgAspect > boxAspect) {           // bars top & bottom
+    fw = dw;  fh = dw / imgAspect; fx = 0;             fy = (dh - fh) / 2;
+  } else {                               // bars left & right (portrait selfie)
+    fh = dh;  fw = dh * imgAspect; fy = 0;             fx = (dw - fw) / 2;
+  }
+
+  // 3. Draw sharp photo on a temporary canvas, then apply a gradient alpha mask
+  //    so its edges fade smoothly into the blurred background beneath it.
+  const sharpCanvas = document.createElement('canvas');
+  sharpCanvas.width  = dw;
+  sharpCanvas.height = dh;
+  const sc = sharpCanvas.getContext('2d');
+  sc.drawImage(img, fx, fy, fw, fh);
+
+  // Gradient mask via destination-in: multiplies each photo pixel's alpha by
+  // the gradient value → 0 at photo edges, 1 in the centre.
+  const photoDim = imgAspect <= boxAspect ? fw : fh; // dimension along bar direction
+  const fadePx   = Math.min(40, photoDim * 0.25);     // fade width in pixels (max 40 px)
+  const t1 = Math.min(fadePx / photoDim, 0.4);        // gradient stop: fully opaque start
+  const t2 = Math.max(1 - fadePx / photoDim, 0.6);   // gradient stop: fully opaque end
+
+  sc.globalCompositeOperation = 'destination-in';
+  let grad;
+  if (imgAspect <= boxAspect) {
+    grad = sc.createLinearGradient(fx, 0, fx + fw, 0); // horizontal (bars on sides)
+  } else {
+    grad = sc.createLinearGradient(0, fy, 0, fy + fh); // vertical (bars on top/bottom)
+  }
+  grad.addColorStop(0,  'rgba(0,0,0,0)'); // photo leading edge — transparent
+  grad.addColorStop(t1, 'rgba(0,0,0,1)'); // opaque zone begins
+  grad.addColorStop(t2, 'rgba(0,0,0,1)'); // opaque zone ends
+  grad.addColorStop(1,  'rgba(0,0,0,0)'); // photo trailing edge — transparent
+  sc.fillStyle = grad;
+  sc.fillRect(0, 0, dw, dh);
+  sc.globalCompositeOperation = 'source-over';
+
+  // 4. Composite the edge-faded sharp photo over the blurred background
+  off.drawImage(sharpCanvas, 0, 0);
+
+  // 5. Draw the finished composite onto the main canvas
+  ctx.drawImage(offCanvas, dx, dy);
 }
 
 /** Trace a rounded-rectangle path on ctx (works on all browsers). */
@@ -341,7 +410,7 @@ async function compositeImages(userPhotoDataURL, templateURL) {
   // (c) Draw user photo *behind* the template — fills the transparent rounded hole
   outCtx.save();
   outCtx.globalCompositeOperation = 'destination-over';
-  drawImageCover(outCtx, userImg, px, py, pw, ph);
+  drawImageContain(outCtx, userImg, px, py, pw, ph);
   outCtx.restore();
 
   // (d) Edge fade — 4 linear gradients blend the photo edges into the bg colour
@@ -590,7 +659,7 @@ const PhotoPage = () => {
           </div>
 
           <div className="photo-controls">
-            <button onClick={goHome}      className="photo-btn-secondary">Home</button>
+            <button onClick={retakePhoto} className="photo-btn-secondary">New Pic</button>
             <button onClick={savePicture} className="photo-btn">Save Picture</button>
           </div>
         </div>
