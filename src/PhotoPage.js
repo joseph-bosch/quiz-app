@@ -352,32 +352,33 @@ async function compositeImages(userPhotoDataURL, templateURL) {
   drawImageContain(outCtx, userImg, px, py, pw, ph);
   outCtx.restore();
 
-  // (d) Outward edge fade — gradients drawn OUTSIDE the hole boundary so the
-  // photo stays sharp inside the frame while the frame edge softly dissolves
-  // into the template background.  Fade zone is 6 % of the shorter dimension.
-  const fadeSize = Math.min(pw, ph) * 0.06;
+  // (d) Inward edge fade — clip to the rounded frame hole, then draw 4 gradient
+  // rects from opaque-background at each edge fading to transparent inward.
+  // Fade zone is 13 % of the shorter frame dimension.
+  const fadeSize = Math.min(pw, ph) * 0.13;
   const bg0 = `rgba(${bgR},${bgG},${bgB},0)`;
-  const bg1 = `rgba(${bgR},${bgG},${bgB},0.82)`;
+  const bg1 = `rgba(${bgR},${bgG},${bgB},0.92)`;
   let g;
-  // Top — gradient runs from hole top edge upward (outward)
-  g = outCtx.createLinearGradient(0, py - fadeSize, 0, py);
-  g.addColorStop(0, bg0); g.addColorStop(1, bg1);
-  outCtx.fillStyle = g; outCtx.fillRect(px, py - fadeSize, pw, fadeSize);
-
-  // Bottom — gradient runs from hole bottom edge downward (outward)
-  g = outCtx.createLinearGradient(0, py + ph, 0, py + ph + fadeSize);
+  outCtx.save();
+  roundedRectPath(outCtx, px, py, pw, ph, pr);
+  outCtx.clip();
+  // Top
+  g = outCtx.createLinearGradient(0, py, 0, py + fadeSize);
   g.addColorStop(0, bg1); g.addColorStop(1, bg0);
-  outCtx.fillStyle = g; outCtx.fillRect(px, py + ph, pw, fadeSize);
-
-  // Left — gradient runs from hole left edge leftward (outward)
-  g = outCtx.createLinearGradient(px - fadeSize, 0, px, 0);
+  outCtx.fillStyle = g; outCtx.fillRect(px, py, pw, fadeSize);
+  // Bottom
+  g = outCtx.createLinearGradient(0, py + ph - fadeSize, 0, py + ph);
   g.addColorStop(0, bg0); g.addColorStop(1, bg1);
-  outCtx.fillStyle = g; outCtx.fillRect(px - fadeSize, py, fadeSize, ph);
-
-  // Right — gradient runs from hole right edge rightward (outward)
-  g = outCtx.createLinearGradient(px + pw, 0, px + pw + fadeSize, 0);
+  outCtx.fillStyle = g; outCtx.fillRect(px, py + ph - fadeSize, pw, fadeSize);
+  // Left
+  g = outCtx.createLinearGradient(px, 0, px + fadeSize, 0);
   g.addColorStop(0, bg1); g.addColorStop(1, bg0);
-  outCtx.fillStyle = g; outCtx.fillRect(px + pw, py, fadeSize, ph);
+  outCtx.fillStyle = g; outCtx.fillRect(px, py, fadeSize, ph);
+  // Right
+  g = outCtx.createLinearGradient(px + pw - fadeSize, 0, px + pw, 0);
+  g.addColorStop(0, bg0); g.addColorStop(1, bg1);
+  outCtx.fillStyle = g; outCtx.fillRect(px + pw - fadeSize, py, fadeSize, ph);
+  outCtx.restore();
 
   return outCanvas.toDataURL('image/png');
 }
