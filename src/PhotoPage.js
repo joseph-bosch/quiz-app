@@ -300,6 +300,14 @@ async function compositeImages(userPhotoDataURL, templateURL) {
     const imgData = scanCtx.getImageData(0, 0, W, H);
     bgR = imgData.data[0]; bgG = imgData.data[1]; bgB = imgData.data[2];
     rect = detectPhotoArea(imgData, W, H);
+    // Resample bg color from the photo interior so edge fades match the local
+    // panel color (handles templates where the photo panel differs from top-left).
+    if (rect) {
+      const cx = (rect.x + (rect.width >> 1)) | 0;
+      const cy = (rect.y + (rect.height >> 1)) | 0;
+      const pi = (cy * W + cx) * 4;
+      bgR = imgData.data[pi]; bgG = imgData.data[pi + 1]; bgB = imgData.data[pi + 2];
+    }
   } catch (e) {
     console.warn('Template pixel scan failed:', e.message);
   }
