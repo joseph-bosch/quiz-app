@@ -16,7 +16,10 @@ const ADMIN_NAMES = ["olarinde joseph", "li dongqin"];
 // ✅ Toggle question count here
 const USE_LIMITED_QUESTIONS = true;   // true = use QUESTION_LIMIT random questions, false = use all questions
 const QUESTION_LIMIT = 10;
-const QUIZ_NAME = "Bosch Shenzhen Carbon quiz";
+
+// Toggle the camera / photo feature here (false = hide the camera button on the welcome screen)
+const SHOW_CAMERA = false;
+const QUIZ_NAME = "Bosch Shenzhen Strategy Training  Quiz 2026/07";
 
 const QuizApp = () => {
   const navigate = useNavigate();
@@ -360,16 +363,18 @@ const QuizApp = () => {
       <div className="welcome-screen">
 
         {/* Camera button sits in its own top bar — never overlaps the card */}
-        <div className="welcome-top-bar">
-          <button
-            className="photo-trigger-btn"
-            onClick={() => navigate('/photoPage')}
-            title="Take a Photo"
-            aria-label="Take a Photo"
-          >
-            📷
-          </button>
-        </div>
+        {SHOW_CAMERA && (
+          <div className="welcome-top-bar">
+            <button
+              className="photo-trigger-btn"
+              onClick={() => navigate('/photoPage')}
+              title="Take a Photo"
+              aria-label="Take a Photo"
+            >
+              📷
+            </button>
+          </div>
+        )}
 
         {/* Content card is centred in the remaining space */}
         <div className="welcome-body">
