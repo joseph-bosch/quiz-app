@@ -11,7 +11,7 @@ import "./App.css";
 const QUESTIONS_URL = "/questions.json";
 const PASS_MARK = 80; // must get 100% to pass
 
-const ADMIN_NAMES = ["olarinde joseph", "li dongqin", "Demi"];
+const ADMIN_NAMES = ["olarinde joseph", "li dongqin", "demi"];
 
 // ✅ Toggle question count here
 const USE_LIMITED_QUESTIONS = true;   // true = use QUESTION_LIMIT random questions, false = use all questions
