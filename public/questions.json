@@ -211,6 +211,7 @@
   },
   {
     "question": "请问14Q准则，这个标识代表什么意思？",
+    "image": "/images/q23-symbol.png",
     "options": [
       "过程重启",
       "安灯系统",

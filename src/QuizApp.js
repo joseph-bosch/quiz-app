@@ -11,7 +11,7 @@ import "./App.css";
 const QUESTIONS_URL = "/questions.json";
 const PASS_MARK = 80; // must get 100% to pass
 
-const ADMIN_NAMES = ["olarinde joseph", "li dongqin"];
+const ADMIN_NAMES = ["olarinde joseph", "li dongqin", "Demi"];
 
 // ✅ Toggle question count here
 const USE_LIMITED_QUESTIONS = true;   // true = use QUESTION_LIMIT random questions, false = use all questions
@@ -574,6 +574,14 @@ const QuizApp = () => {
 
       <div className="quiz-question animate">
         <p><strong style={{ fontSize: '25px' }}>{currentQuestion.question}</strong></p>
+
+        {currentQuestion.image && (
+          <img
+            src={currentQuestion.image}
+            alt="题目图示"
+            style={{ display: 'block', margin: '12px auto', width: '90px', height: '90px', objectFit: 'contain', background: '#fff', borderRadius: '8px', padding: '8px' }}
+          />
+        )}
 
         {isMultiple && (
           <p style={{ fontStyle: 'italic', color: 'white', marginBottom: '10px', fontSize: '15px' }}>
