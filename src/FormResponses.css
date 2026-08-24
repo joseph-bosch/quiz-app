@@ -1,0 +1,268 @@
+/* FormResponses.css — admin table of mini-program suggestions */
+
+.fr-page {
+  min-height: 100vh;
+  padding: 32px 14px 60px;
+  box-sizing: border-box;
+  background: #f4f6f8;
+  font-family: "Segoe UI", sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.fr-card {
+  width: 100%;
+  max-width: 1040px;
+  background: #ffffff;
+  border: 1px solid #e2e6ea;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.09);
+  padding: 26px 28px 30px;
+  box-sizing: border-box;
+}
+
+.fr-title {
+  margin: 0 0 18px;
+  font-size: 23px;
+  color: #1b1b1b;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── toolbar ── */
+.fr-toolbar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.fr-right { margin-left: auto; }
+
+.fr-btn {
+  padding: 9px 16px;
+  font-size: 14px;
+  font-family: inherit;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.fr-btn:hover:not(:disabled) { filter: brightness(0.94); transform: translateY(-1px); }
+.fr-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.fr-btn-grey  { background: #eceff1; color: #263238; border: 1px solid #cfd8dc; }
+.fr-btn-green { background: #4caf50; color: #fff; }
+.fr-btn-blue  { background: #1e88e5; color: #fff; }
+
+/* ── alerts / empty ── */
+.fr-alert {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  background: #fff4f4;
+  border: 1px solid #f3ced1;
+  border-left: 4px solid #e53935;
+  border-radius: 6px;
+  color: #b3261e;
+  font-size: 14px;
+  word-break: break-word;
+}
+
+.fr-alert-hint { margin-top: 6px; font-size: 12.5px; color: #7a4a47; }
+
+.fr-empty {
+  padding: 34px 0;
+  text-align: center;
+  color: #78909c;
+  font-size: 15px;
+}
+
+/* ── table ── */
+.fr-table-wrap { overflow-x: auto; }
+
+.fr-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14.5px;
+}
+
+.fr-table th {
+  background: #f2f2f2;
+  padding: 12px 12px;
+  text-align: left;
+  border-bottom: 1px solid #ccc;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.fr-table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid #eee;
+  vertical-align: middle;
+}
+
+.fr-table tbody tr:nth-child(even) { background: #f9f9f9; }
+.fr-table tbody tr:hover { background: #eef6ff; }
+
+.fr-nopic { color: #9aa5b1; font-size: 13px; }
+
+.fr-pic-actions { display: flex; gap: 7px; flex-wrap: wrap; }
+
+.fr-mini {
+  padding: 6px 11px;
+  font-size: 12.5px;
+  font-family: inherit;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  color: #fff;
+  white-space: nowrap;
+  transition: filter 0.15s ease;
+}
+
+.fr-mini:hover:not(:disabled) { filter: brightness(0.92); }
+.fr-mini:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.fr-mini-blue  { background: #1e88e5; }
+.fr-mini-green { background: #43a047; }
+
+/* ── pager ── */
+.fr-pager {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.fr-pageinfo { font-weight: 600; color: #37474f; font-size: 14px; }
+
+/* ── access denied ── */
+.fr-denied { max-width: 480px; text-align: center; padding: 44px 30px; }
+.fr-denied-icon { font-size: 42px; margin-bottom: 10px; }
+.fr-denied h2 { margin: 0 0 10px; font-size: 22px; color: #1b1b1b; }
+.fr-denied p { margin: 0 0 22px; color: #5f6b76; font-size: 14.5px; line-height: 1.6; }
+
+/* ============================================================
+   Preview modal
+   ============================================================ */
+.fr-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 18, 30, 0.62);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+  animation: fr-fade 0.18s ease both;
+}
+
+@keyframes fr-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.fr-modal {
+  background: #fff;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.35);
+  animation: fr-pop 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes fr-pop {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+
+.fr-modal-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid #eceff1;
+}
+
+.fr-modal-meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.fr-modal-meta strong { font-size: 16px; color: #1b1b1b; }
+.fr-modal-meta span { font-size: 12.5px; color: #78909c; }
+
+.fr-close {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  font-size: 17px;
+  color: #78909c;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.fr-close:hover { background: #ffe9ea; color: #e53935; }
+
+.fr-modal-body {
+  padding: 18px;
+  overflow: auto;
+  background:
+    repeating-conic-gradient(#f4f6f8 0% 25%, #ffffff 0% 50%) 50% / 20px 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+}
+
+/* checkerboard behind the image makes transparent PNGs readable */
+.fr-preview-img {
+  max-width: 100%;
+  max-height: 58vh;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.18);
+}
+
+.fr-download-note {
+  margin: 0;
+  padding: 8px 18px;
+  font-size: 13px;
+  color: #b3261e;
+  background: #fff4f4;
+}
+
+.fr-modal-foot {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 14px 18px;
+  border-top: 1px solid #eceff1;
+  flex-wrap: wrap;
+}
+
+/* ── small screens ── */
+@media (max-width: 620px) {
+  .fr-card { padding: 20px 16px 24px; }
+  .fr-title { font-size: 19px; }
+  .fr-right { margin-left: 0; }
+  .fr-table { font-size: 13px; }
+  .fr-table th, .fr-table td { padding: 9px 8px; }
+  .fr-modal-foot .fr-btn { flex: 1; justify-content: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fr-overlay, .fr-modal { animation: none; }
+  .fr-btn:hover:not(:disabled) { transform: none; }
+}

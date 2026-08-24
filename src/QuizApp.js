@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from "react";
 import Select from "react-select";
 import { supabase } from "./supabaseClient";
+import { departmentOptions as departments } from "./departments";
+import { isAdminName } from "./admins";
 import * as XLSX from "xlsx";
 import { useNavigate } from "react-router-dom";
 import { PDFDocument, rgb } from "pdf-lib";
@@ -11,7 +13,6 @@ import "./App.css";
 const QUESTIONS_URL = "/questions.json";
 const PASS_MARK = 80; // must get 100% to pass
 
-const ADMIN_NAMES = ["olarinde joseph", "li dongqin", "demi"];
 
 // ✅ Toggle question count here
 const USE_LIMITED_QUESTIONS = true;   // true = use QUESTION_LIMIT random questions, false = use all questions
@@ -49,19 +50,8 @@ const QuizApp = () => {
   // explanation state (only used when correct)
   const [explainState, setExplainState] = useState(null); // { qIndex, option, text, ts }
 
-  const departments = [
-    "BD/SLP-CO2", "C/TXR-CN-D4", "GR/FCM-Shz", "GS/OBR23-APAC17", "GS/OSD4-APAC16",
-    "GS/PSD5-AP", "MA/HRL-Shz", "MA-WS/PAS-EAA-CN", "MA-WS/PAW-ENG1-CN", "MA-WS/PAW-ENG2-CN",
-    "MA-WS/PAW-ENG3-CN", "MA-WS/PAW-ENG-CN", "MA-WS/PUQ1-Shz", "MA-WS/PUQ2-Shz", "MA-WS/PUQ-Shz",
-    "MA-WS/PUR2", "ShzP/COR", "ShzP/CTG", "ShzP/HSE", "ShzP/LOG", "ShzP/LOP", "ShzP/LOW", "ShzP/LOW1",
-    "ShzP/LOW2", "ShzP/MFE", "ShzP/MFI", "ShzP/MFO1", "ShzP/MFO11", "ShzP/MFO12", "ShzP/MFO13",
-    "ShzP/MFO2", "ShzP/MFO21", "ShzP/MFO22", "ShzP/MFO23", "ShzP/MFO24", "ShzP/MFO3", "ShzP/MFO31",
-    "ShzP/MFO32", "ShzP/MFO33", "ShzP/MFO4", "ShzP/MFO5", "ShzP/MFO51", "ShzP/MFO52", "ShzP/MFO53",
-    "ShzP/MOE", "ShzP/PM", "ShzP/QMM", "ShzP/QMM1", "ShzP/QMM2", "ShzP/QMM6", "ShzP/TEF", "ShzP/TEF1",
-    "ShzP/TEF2"
-  ].map((dept) => ({ value: dept, label: dept }));
 
-  const isAdmin = ADMIN_NAMES.includes(name.trim().toLowerCase());
+  const isAdmin = isAdminName(name);
 
   const thStyle = { padding: "0.75rem", borderBottom: "1px solid #ccc", textAlign: "left" };
   const tdStyle = { padding: "0.75rem", borderBottom: "1px solid #eee" };

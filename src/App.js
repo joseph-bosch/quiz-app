@@ -52,7 +52,7 @@
 //   ].map((dept) => ({ value: dept, label: dept }));
 
 //   // const name = `${firstName.trim()} ${lastName.trim()}`.trim();
-//   const isAdmin = ADMIN_NAMES.includes(name.trim().toLowerCase());
+//   const isAdmin = isAdminName(name);
 
 //   const thStyle = {
 //     padding: "0.75rem",
@@ -796,6 +796,9 @@ import { HashRouter as Router, Route, Routes } from "react-router-dom";
 import QuizApp from "./QuizApp";
 import VoicePage from "./VoicePage";
 import PhotoPage from "./PhotoPage";
+import FormPage from "./FormPage";
+import FormResponses from "./FormResponses";
+import { isAdminName } from "./admins";
 
 function App() {
   return (
@@ -805,6 +808,11 @@ function App() {
         <Route path="/audioPage" element={<VoicePageWrapper />} />
         <Route path="/audioPage/:audioName" element={<VoicePageWrapper />} />
         <Route path="/photoPage" element={<PhotoPage />} />
+
+        <Route path="/formPage" element={<FormPage />} />
+
+
+        <Route path="/formResponses" element={<FormResponses />} />
       </Routes>
     </Router>
   );
@@ -814,8 +822,7 @@ function App() {
 function VoicePageWrapper() {
   const empNum = localStorage.getItem("employeeNo") || "";
   const name = localStorage.getItem("name") || "";
-  const ADMIN_NAMES = ["olarinde joseph", "li dongqin", "demi"];
-  const isAdmin = ADMIN_NAMES.includes(name.trim().toLowerCase());
+  const isAdmin = isAdminName(name);
 
   return (
     <VoicePage

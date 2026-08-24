@@ -1,0 +1,768 @@
+/* FormPage.css — mini-program suggestion form */
+
+/* ============================================================
+   Palette (Bosch-flavoured, matching the quiz welcome screen)
+   ============================================================ */
+:root {
+  --fp-navy-deep: #001424;
+  --fp-navy: #00243f;
+  --fp-navy-lite: #013a5e;
+  --fp-blue: #0a84ff;
+  --fp-blue-dk: #0a6ed1;
+  --fp-turquoise: #00a8b0;
+  --fp-purple: #9e2896;
+  --fp-red: #ed0007;
+  --fp-yellow: #ffcf00;
+  --fp-green: #00884a;
+  --fp-ink: #1b1b1b;
+  --fp-muted: #5f6b76;
+}
+
+/* ============================================================
+   Page shell
+   ============================================================ */
+.form-page {
+  position: relative;
+  min-height: 100vh;
+  padding: 40px 14px 70px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  box-sizing: border-box;
+  background:
+    radial-gradient(ellipse 120% 80% at 50% -10%, #01304f 0%, transparent 60%),
+    linear-gradient(155deg, var(--fp-navy-deep) 0%, var(--fp-navy) 48%, var(--fp-navy-lite) 100%);
+  background-size: 100% 100%, 200% 200%;
+  animation: fp-bg-shift 24s ease-in-out infinite;
+  overflow-x: hidden;
+}
+
+@keyframes fp-bg-shift {
+  0%, 100% { background-position: 50% 0%, 0% 50%; }
+  50%      { background-position: 50% 0%, 100% 50%; }
+}
+
+/* ============================================================
+   Decorative background — fixed so it never creates scrollbars
+   Layer order: aurora → grid → beams → blobs → shapes → particles → grain
+   ============================================================ */
+.form-bg {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── 1. Aurora: slowly rotating conic ribbons ── */
+.fp-aurora {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 130vmax; height: 130vmax;
+  margin: -65vmax 0 0 -65vmax;
+  background: conic-gradient(from 0deg,
+    transparent 0deg,
+    rgba(0, 168, 176, 0.30) 38deg,
+    transparent 88deg,
+    rgba(158, 40, 150, 0.26) 148deg,
+    transparent 198deg,
+    rgba(10, 132, 255, 0.32) 258deg,
+    transparent 306deg,
+    rgba(0, 136, 74, 0.20) 338deg,
+    transparent 360deg);
+  filter: blur(58px);
+  opacity: 0.7;
+  will-change: transform;
+  animation: fp-rotate 68s linear infinite;
+}
+
+.fp-aurora-2 {
+  width: 95vmax; height: 95vmax;
+  margin: -47.5vmax 0 0 -47.5vmax;
+  background: conic-gradient(from 180deg,
+    transparent 0deg,
+    rgba(255, 207, 0, 0.16) 50deg,
+    transparent 110deg,
+    rgba(237, 0, 7, 0.14) 190deg,
+    transparent 250deg,
+    rgba(0, 168, 176, 0.22) 320deg,
+    transparent 360deg);
+  filter: blur(66px);
+  opacity: 0.55;
+  animation: fp-rotate 92s linear infinite reverse;
+}
+
+@keyframes fp-rotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ── 2. Dot grid, panning slowly, faded at the edges ── */
+.fp-grid {
+  position: absolute;
+  inset: -12%;
+  background-image: radial-gradient(rgba(150, 205, 255, 0.20) 1.2px, transparent 1.2px);
+  background-size: 36px 36px;
+  -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 40%, transparent 22%, #000 78%);
+  mask-image: radial-gradient(ellipse 90% 70% at 50% 40%, transparent 22%, #000 78%);
+  animation: fp-grid-pan 36s linear infinite;
+}
+
+@keyframes fp-grid-pan {
+  from { background-position: 0 0; }
+  to   { background-position: 360px 360px; }
+}
+
+/* ── 3. Diagonal light beams sweeping across ── */
+.fp-beams span {
+  position: absolute;
+  top: -45%;
+  width: 170px;
+  height: 190%;
+  background: linear-gradient(180deg, transparent, rgba(140, 205, 255, 0.14), transparent);
+  transform: rotate(16deg);
+  filter: blur(16px);
+  will-change: transform;
+}
+
+.fp-beams span:nth-child(1) { left: 4%;  animation: fp-beam 21s ease-in-out infinite; }
+.fp-beams span:nth-child(2) { left: 34%; animation: fp-beam 27s ease-in-out infinite 5s; opacity: 0.7; }
+.fp-beams span:nth-child(3) { left: 68%; animation: fp-beam 24s ease-in-out infinite 11s; opacity: 0.85; }
+
+@keyframes fp-beam {
+  0%, 100% { transform: rotate(16deg) translateX(-140px); opacity: 0; }
+  18%, 78% { opacity: 1; }
+  50%      { transform: rotate(16deg) translateX(180px); }
+}
+
+/* ── 4. Morphing organic blobs (no blur: cheaper + glassier) ── */
+.blob {
+  position: absolute;
+  will-change: transform, border-radius;
+}
+
+.blob-1 {
+  width: 300px; height: 300px;
+  top: 9%; left: 4%;
+  background: linear-gradient(140deg, rgba(0, 168, 176, 0.30), rgba(10, 132, 255, 0.06));
+  animation: fp-morph 19s ease-in-out infinite, fp-float 23s ease-in-out infinite;
+}
+
+.blob-2 {
+  width: 260px; height: 260px;
+  bottom: 8%; right: 6%;
+  background: linear-gradient(140deg, rgba(158, 40, 150, 0.28), rgba(237, 0, 7, 0.06));
+  animation: fp-morph 24s ease-in-out infinite reverse, fp-float 29s ease-in-out infinite 2s;
+}
+
+.blob-3 {
+  width: 200px; height: 200px;
+  top: 58%; left: 14%;
+  background: linear-gradient(140deg, rgba(255, 207, 0, 0.20), rgba(0, 136, 74, 0.05));
+  animation: fp-morph 21s ease-in-out infinite 3s, fp-float 26s ease-in-out infinite 1s;
+}
+
+@keyframes fp-morph {
+  0%, 100% { border-radius: 42% 58% 63% 37% / 41% 44% 56% 59%; }
+  33%      { border-radius: 65% 35% 38% 62% / 56% 33% 67% 44%; }
+  66%      { border-radius: 33% 67% 57% 43% / 63% 61% 39% 37%; }
+}
+
+/* ── 5. Crisp geometric marks (Bosch supergraphic language) ── */
+.form-bg .shape {
+  position: absolute;
+  display: block;
+  opacity: 0.55;
+  will-change: transform;
+}
+
+.shape-ring {
+  width: 200px; height: 200px;
+  border: 15px solid rgba(120, 190, 255, 0.28);
+  border-radius: 50%;
+  top: 13%; left: 6%;
+  animation: fp-float 15s ease-in-out infinite;
+}
+
+.shape-ring-2 {
+  width: 110px; height: 110px;
+  border: 8px solid rgba(0, 168, 176, 0.32);
+  border-radius: 50%;
+  bottom: 26%; left: 30%;
+  animation: fp-float 18s ease-in-out infinite 3s;
+}
+
+.shape-square {
+  width: 120px; height: 120px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(124, 140, 255, 0.34), rgba(10, 132, 255, 0.12));
+  top: 70%; left: 10%;
+  animation: fp-spin-slow 30s linear infinite;
+}
+
+/* "leaf" — one square corner, three round: the Bosch supergraphic shape */
+.shape-leaf {
+  width: 155px; height: 155px;
+  border-radius: 50% 50% 50% 6px;
+  background: linear-gradient(135deg, rgba(158, 40, 150, 0.30), rgba(10, 132, 255, 0.10));
+  top: 18%; right: 9%;
+  animation: fp-float 19s ease-in-out infinite 1.5s;
+}
+
+.shape-leaf-2 {
+  width: 92px; height: 92px;
+  border-radius: 6px 50% 50% 50%;
+  background: linear-gradient(135deg, rgba(0, 168, 176, 0.32), transparent);
+  top: 46%; right: 4%;
+  animation: fp-float 22s ease-in-out infinite 4s;
+}
+
+.shape-dot {
+  width: 76px; height: 76px;
+  border-radius: 50%;
+  background: rgba(255, 207, 0, 0.30);
+  bottom: 15%; right: 22%;
+  animation: fp-float 13s ease-in-out infinite 0.8s;
+}
+
+.shape-pill {
+  width: 46px; height: 130px;
+  border-radius: 40px;
+  background: linear-gradient(180deg, rgba(0, 168, 176, 0.38), transparent);
+  top: 7%; right: 30%;
+  animation: fp-float 17s ease-in-out infinite 2.2s;
+}
+
+.shape-tri {
+  width: 108px; height: 96px;
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+  background: linear-gradient(180deg, rgba(237, 0, 7, 0.20), transparent);
+  bottom: 34%; right: 34%;
+  animation: fp-spin-slow 40s linear infinite reverse;
+}
+
+.shape-cross {
+  width: 70px; height: 70px;
+  background:
+    linear-gradient(rgba(150, 205, 255, 0.34), rgba(150, 205, 255, 0.34)) center/100% 12px no-repeat,
+    linear-gradient(rgba(150, 205, 255, 0.34), rgba(150, 205, 255, 0.34)) center/12px 100% no-repeat;
+  top: 34%; left: 22%;
+  animation: fp-spin-slow 34s linear infinite;
+}
+
+@keyframes fp-float {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  50%      { transform: translate3d(0, -32px, 0) rotate(7deg); }
+}
+
+@keyframes fp-spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ── 6. Rising particles ── */
+.fp-particles span {
+  position: absolute;
+  bottom: -24px;
+  border-radius: 50%;
+  background: rgba(165, 220, 255, 0.55);
+  box-shadow: 0 0 8px rgba(120, 200, 255, 0.5);
+  will-change: transform, opacity;
+  animation: fp-rise-up var(--dur, 16s) linear infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+@keyframes fp-rise-up {
+  0%   { transform: translate3d(0, 0, 0) scale(1); opacity: 0; }
+  12%  { opacity: 0.75; }
+  85%  { opacity: 0.45; }
+  100% { transform: translate3d(22px, -104vh, 0) scale(0.5); opacity: 0; }
+}
+
+/* ── 7. Film grain for depth ── */
+.fp-noise {
+  position: absolute;
+  inset: 0;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ============================================================
+   Card
+   ============================================================ */
+.form-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 660px;
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 18px;
+  box-shadow:
+    0 26px 60px rgba(0, 12, 25, 0.5),
+    0 4px 14px rgba(0, 12, 25, 0.28);
+  padding: 40px 34px 34px;
+  box-sizing: border-box;
+  text-align: left;
+  overflow: hidden;
+  animation: fp-card-in 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* animated Bosch spectrum stripe across the top */
+.form-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 6px;
+  background: linear-gradient(90deg,
+    var(--fp-purple), var(--fp-blue), var(--fp-turquoise),
+    var(--fp-green), var(--fp-yellow), var(--fp-red), var(--fp-purple));
+  background-size: 300% 100%;
+  animation: fp-stripe 9s linear infinite;
+}
+
+@keyframes fp-stripe {
+  from { background-position: 0% 0; }
+  to   { background-position: 300% 0; }
+}
+
+@keyframes fp-card-in {
+  from { opacity: 0; transform: translateY(34px) scale(0.975); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* admin-only shortcut to the responses table, top-right of the card */
+.form-admin-btn {
+  position: absolute;
+  top: 20px;
+  right: 22px;
+  z-index: 2;
+  padding: 8px 15px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  color: #fff;
+  background: linear-gradient(135deg, #1e88e5, #0a5fd0);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(10, 132, 255, 0.32);
+  animation: fp-pop 0.4s cubic-bezier(0.22, 1, 0.36, 1) both 0.3s;
+  transition: transform 0.16s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.form-admin-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(10, 132, 255, 0.42);
+  filter: brightness(1.06);
+}
+
+.form-admin-btn:active { transform: translateY(0); }
+
+.form-title {
+  margin: 0 0 8px;
+  padding-right: 118px; /* keep the heading clear of the admin button */
+  font-size: 29px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: var(--fp-ink);
+  animation: fp-rise 0.6s ease both 0.12s;
+}
+
+.form-subtitle {
+  margin: 0 0 30px;
+  font-size: 14.5px;
+  color: var(--fp-muted);
+  animation: fp-rise 0.6s ease both 0.19s;
+}
+
+@keyframes fp-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ============================================================
+   Questions — staggered entrance via --i
+   ============================================================ */
+.form-question {
+  margin-bottom: 26px;
+  padding-left: 14px;
+  border-left: 3px solid transparent;
+  transition: border-color 0.25s ease;
+  animation: fp-rise 0.55s ease both;
+  animation-delay: calc(0.24s + var(--i, 0) * 0.075s);
+}
+
+.form-question:focus-within { border-left-color: var(--fp-blue); }
+
+.form-label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--fp-ink);
+  line-height: 1.45;
+}
+
+.req { color: var(--fp-red); margin-left: 4px; }
+
+.form-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  font-size: 15px;
+  font-family: inherit;
+  color: var(--fp-ink);
+  background: #f6f8fa;
+  border: 1.5px solid #dde3e9;
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 0.2s ease, background 0.2s ease,
+              box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.form-input::placeholder { color: #9aa5b1; }
+
+.form-input:hover:not(:focus) { border-color: #c3ccd6; }
+
+.form-input:focus {
+  border-color: var(--fp-blue);
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(10, 132, 255, 0.14);
+  transform: translateY(-1px);
+}
+
+/* ============================================================
+   File upload — drop-zone styling
+   ============================================================ */
+.form-file-input { display: none; }
+
+.form-upload-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 20px 18px;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--fp-blue-dk);
+  background: #f6f9ff;
+  border: 2px dashed #b9d3f5;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease,
+              transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.form-upload-btn:hover {
+  background: #eaf3ff;
+  border-color: var(--fp-blue);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(10, 132, 255, 0.18);
+}
+
+.form-upload-btn:active { transform: translateY(0); }
+
+.form-upload-btn.is-dragging {
+  background: #e2efff;
+  border-color: var(--fp-blue);
+  border-style: solid;
+  transform: scale(1.015);
+  box-shadow: 0 0 0 4px rgba(10, 132, 255, 0.16);
+}
+
+.form-upload-icon { font-size: 19px; }
+
+.form-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--fp-muted);
+}
+
+/* selected file chip */
+.form-file-chip {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-top: 13px;
+  padding: 11px 13px;
+  background: linear-gradient(135deg, #f2fbf6, #eef7ff);
+  border: 1px solid #cfe9db;
+  border-radius: 12px;
+  animation: fp-pop 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes fp-pop {
+  from { opacity: 0; transform: translateY(-8px) scale(0.95); }
+  to   { opacity: 1; transform: none; }
+}
+
+.form-file-thumb {
+  width: 52px; height: 52px;
+  object-fit: cover;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid #e1dfdd;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.form-file-meta { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+
+.form-file-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fp-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.form-file-size { font-size: 12px; color: var(--fp-muted); }
+
+.form-file-remove {
+  background: transparent;
+  border: none;
+  color: var(--fp-muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 6px 9px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.form-file-remove:hover {
+  background: #ffe9ea;
+  color: var(--fp-red);
+  transform: rotate(90deg);
+}
+
+/* ============================================================
+   Errors
+   ============================================================ */
+.form-error {
+  margin: 9px 0 0;
+  font-size: 13px;
+  color: var(--fp-red);
+  animation: fp-shake 0.4s ease both;
+}
+
+@keyframes fp-shake {
+  0%, 100%   { transform: translateX(0); }
+  22%, 66%   { transform: translateX(-5px); }
+  44%, 88%   { transform: translateX(5px); }
+}
+
+.form-submit-error {
+  margin-top: 18px;
+  padding: 12px 14px;
+  background: #fff4f4;
+  border: 1px solid #f6cdd0;
+  border-left: 4px solid var(--fp-red);
+  border-radius: 8px;
+  word-break: break-word;
+}
+
+/* ============================================================
+   Actions
+   ============================================================ */
+.form-actions {
+  margin-top: 6px;
+  padding-top: 24px;
+  border-top: 1px solid #eceff2;
+  animation: fp-rise 0.55s ease both 0.7s;
+}
+
+.form-submit-btn {
+  position: relative;
+  overflow: hidden;
+  padding: 13px 40px;
+  font-size: 15.5px;
+  font-weight: 600;
+  font-family: inherit;
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--fp-blue), #0a5fd0);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(10, 132, 255, 0.34);
+  transition: transform 0.18s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+/* shimmer sweep on hover */
+.form-submit-btn::after {
+  content: "";
+  position: absolute;
+  top: 0; left: -120%;
+  width: 60%; height: 100%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.42), transparent);
+  transform: skewX(-20deg);
+}
+
+.form-submit-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 26px rgba(10, 132, 255, 0.44);
+  filter: saturate(1.1);
+}
+
+.form-submit-btn:hover:not(:disabled)::after { animation: fp-shimmer 0.85s ease; }
+
+@keyframes fp-shimmer {
+  to { left: 130%; }
+}
+
+.form-submit-btn:active:not(:disabled) { transform: translateY(0) scale(0.985); }
+
+.form-submit-btn:disabled {
+  background: #cbd2d9;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.form-secondary-btn {
+  padding: 13px 30px;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--fp-ink);
+  background: #ffffff;
+  border: 1.5px solid #d3dae1;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.18s ease;
+}
+
+.form-secondary-btn:hover {
+  background: #f4f7fa;
+  border-color: #a9b6c2;
+  transform: translateY(-2px);
+}
+
+/* spinner shown while submitting */
+.form-spinner {
+  display: inline-block;
+  width: 15px; height: 15px;
+  margin-right: 9px;
+  vertical-align: -2px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: fp-spin 0.7s linear infinite;
+}
+
+@keyframes fp-spin { to { transform: rotate(360deg); } }
+
+/* ============================================================
+   Success state
+   ============================================================ */
+.form-done { text-align: center; padding: 52px 34px 44px; }
+
+.form-check {
+  width: 92px; height: 92px;
+  margin: 0 auto 22px;
+  display: block;
+}
+
+.form-check circle {
+  stroke: var(--fp-green);
+  stroke-width: 3;
+  fill: rgba(0, 136, 74, 0.08);
+  stroke-dasharray: 170;
+  stroke-dashoffset: 170;
+  animation: fp-draw 0.65s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+}
+
+.form-check path {
+  stroke: var(--fp-green);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  stroke-dasharray: 50;
+  stroke-dashoffset: 50;
+  animation: fp-draw 0.4s cubic-bezier(0.65, 0, 0.45, 1) 0.55s forwards;
+}
+
+@keyframes fp-draw { to { stroke-dashoffset: 0; } }
+
+.form-done h2 {
+  margin: 0 0 10px;
+  font-size: 25px;
+  color: var(--fp-ink);
+  animation: fp-rise 0.5s ease both 0.8s;
+}
+
+.form-done p {
+  margin: 0 0 28px;
+  font-size: 15px;
+  color: var(--fp-muted);
+  animation: fp-rise 0.5s ease both 0.9s;
+}
+
+.form-done-actions {
+  display: flex;
+  gap: 13px;
+  justify-content: center;
+  flex-wrap: wrap;
+  animation: fp-rise 0.5s ease both 1s;
+}
+
+/* ============================================================
+   Small screens — drop the heaviest decoration
+   ============================================================ */
+@media (max-width: 560px) {
+  .form-page { padding: 18px 10px 46px; }
+  .form-card { padding: 30px 20px 26px; border-radius: 14px; }
+  .form-title { font-size: 23px; }
+  .form-label { font-size: 15px; }
+  .form-question { margin-bottom: 22px; padding-left: 11px; }
+  .form-submit-btn, .form-secondary-btn { width: 100%; }
+  .form-done { padding: 40px 20px 34px; }
+
+  .shape-ring, .shape-pill, .shape-cross, .shape-tri,
+  .fp-beams, .fp-noise, .blob-3, .fp-aurora-2 { display: none; }
+  .fp-aurora { filter: blur(44px); opacity: 0.55; }
+  .fp-particles span:nth-child(n + 9) { display: none; }
+}
+
+/* ============================================================
+   Respect reduced-motion preferences
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  .form-page,
+  .fp-aurora,
+  .fp-grid,
+  .fp-beams span,
+  .blob,
+  .form-bg .shape,
+  .fp-particles span,
+  .form-card,
+  .form-card::before,
+  .form-title,
+  .form-subtitle,
+  .form-question,
+  .form-actions,
+  .form-file-chip,
+  .form-error,
+  .form-done h2,
+  .form-done p,
+  .form-done-actions,
+  .form-check circle,
+  .form-check path {
+    animation: none !important;
+  }
+  .fp-particles, .fp-beams { display: none; }
+  .form-check circle, .form-check path { stroke-dashoffset: 0 !important; }
+  .form-input:focus,
+  .form-upload-btn:hover,
+  .form-submit-btn:hover:not(:disabled),
+  .form-secondary-btn:hover { transform: none; }
+  .form-submit-btn::after { display: none; }
+  .form-file-remove:hover { transform: none; }
+}
